@@ -40,13 +40,16 @@ public class WorkspaceItemSpaceFinder {
     private final BgDataModel mDataModel;
     private final InvariantDeviceProfile mIDP;
     private final LauncherModel mModel;
+    private final android.content.Context mContext;
 
     @Inject
     WorkspaceItemSpaceFinder(
-            BgDataModel dataModel, InvariantDeviceProfile idp, LauncherModel model) {
+            BgDataModel dataModel, InvariantDeviceProfile idp, LauncherModel model,
+            @com.android.launcher3.dagger.ApplicationContext android.content.Context context) {
         mDataModel = dataModel;
         mIDP = idp;
         mModel = model;
+        mContext = context;
     }
 
     /**
@@ -138,7 +141,7 @@ public class WorkspaceItemSpaceFinder {
             screenId = screenItems.keyAt(screenIndex);
             if (!excludedScreens.contains(screenId)
                     && findNextAvailableIconSpaceInScreen(
-                            screenItems.get(screenId), startingFromCellX, startingFromCellY, spanX,
+                            screenItems.get(screenId), screenId, startingFromCellX, startingFromCellY, spanX,
                             spanY, cellXY)) {
                 found = true;
                 break;
@@ -150,10 +153,12 @@ public class WorkspaceItemSpaceFinder {
         if (!found) {
             // Still no position found. Add a new screen to the end.
             screenId = mModel.getModelDbController().getNewScreenId();
+            // Items queued in this task are not necessarily in the DB yet.
+            while (screenItems.indexOfKey(screenId) >= 0) screenId++;
 
             // If we still can't find an empty space, then God help us all!!!
             if (!findNextAvailableIconSpaceInScreen(
-                    screenItems.get(screenId), startingFromCellX, startingFromCellY, spanX, spanY,
+                    screenItems.get(screenId), screenId, startingFromCellX, startingFromCellY, spanX, spanY,
                     cellXY)) {
                 throw new RuntimeException("Can't find space to add the item");
             }
@@ -163,9 +168,15 @@ public class WorkspaceItemSpaceFinder {
     }
 
     private boolean findNextAvailableIconSpaceInScreen(
-            List<ItemInfo> occupiedPos, int startingFromCellX, int startingFromCellY, int spanX,
+            List<ItemInfo> occupiedPos, int screenId, int startingFromCellX, int startingFromCellY, int spanX,
             int spanY, int[] cellXY) {
         GridOccupancy occupied = new GridOccupancy(mIDP.numColumns, mIDP.numRows);
+        if (screenId == FIRST_SCREEN_ID
+                && com.android.launcher3.LauncherPrefs.SHOW_QUICKSPACE.get(mContext)) {
+            occupied.markCells(0, 0, mIDP.numColumns,
+                    com.android.launcher3.Workspace.getQuickSpaceSpanY(
+                            mContext, mIDP.numRows), true);
+        }
 
         // Mark cells left-to-right, top-to-bottom as occupied from [0, 0] until
         // (startingFromCellX, startingFromCellY).

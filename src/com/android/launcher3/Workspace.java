@@ -721,12 +721,76 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         super.onViewAdded(child);
     }
 
+    private View mFirstPagePinnedItem;
+
     /**
      * Initializes and binds the first page
      */
     public void bindAndInitFirstWorkspaceScreen() {
         // Add the first page
-        insertNewWorkspaceScreen(Workspace.FIRST_SCREEN_ID, getChildCount());
+        CellLayout firstPage = insertNewWorkspaceScreen(Workspace.FIRST_SCREEN_ID, getChildCount());
+        if (!LauncherPrefs.SHOW_QUICKSPACE.get(getContext())) {
+            mFirstPagePinnedItem = null;
+            return;
+        }
+
+        if (mFirstPagePinnedItem == null) {
+            // As workspace does not touch the edges, we do not need a full
+            // width first page pinned item.
+            mFirstPagePinnedItem = LayoutInflater.from(getContext())
+                    .inflate(R.layout.reserved_container_workspace, firstPage, false);
+        } else if (mFirstPagePinnedItem.getParent() instanceof ViewGroup oldParent) {
+            // Still attached to the container of a page that was just removed
+            oldParent.removeView(mFirstPagePinnedItem);
+        }
+
+        if (!firstPage.addViewToCellLayout(mFirstPagePinnedItem, 0,
+                R.id.reserved_container_workspace, getQuickSpaceLayoutParams(firstPage), true)) {
+            Log.e(TAG, "Failed to add to item at (0, 0) to CellLayout");
+            mFirstPagePinnedItem = null;
+        }
+    }
+
+    /** Returns the cell span the QuickSpace occupies on the first page. */
+    public static int getQuickSpaceSpanY(Context context, int countY) {
+        int style = com.android.launcher3.quickspace.QuickSpacePreferences.getStyle(context);
+        boolean minimalMode = LauncherPrefs.QUICKSPACE_VOLTAGE_MINIMAL.get(context);
+        int spanY = 1;
+        if (style == 2 || style == 3 || style == 5 || style == 6) {
+            spanY = minimalMode ? 2 : 3;
+        } else if (style == 4) {
+            spanY = 2;
+        }
+        return Math.max(1, Math.min(spanY, countY));
+    }
+
+    private CellLayoutLayoutParams getQuickSpaceLayoutParams(CellLayout firstPage) {
+        CellLayoutLayoutParams lp = new CellLayoutLayoutParams(0, 0,
+                firstPage.getCountX(), getQuickSpaceSpanY(getContext(), firstPage.getCountY()));
+        lp.canReorder = false;
+        return lp;
+    }
+
+    private void refreshFirstPageWidget() {
+        if (mFirstPagePinnedItem == null || getPageCount() == 0) return;
+        CellLayout firstPage = getScreenWithId(FIRST_SCREEN_ID);
+        if (firstPage == null) return;
+        CellLayoutLayoutParams lp = getQuickSpaceLayoutParams(firstPage);
+        // CellLayout parents its children to its ShortcutAndWidgetContainer
+        ViewParent parent = mFirstPagePinnedItem.getParent();
+        if (parent == firstPage.getShortcutsAndWidgets()
+                && mFirstPagePinnedItem.getLayoutParams() instanceof CellLayoutLayoutParams cur
+                && cur.getCellX() == lp.getCellX() && cur.getCellY() == lp.getCellY()
+                && cur.cellHSpan == lp.cellHSpan && cur.cellVSpan == lp.cellVSpan) {
+            return;
+        }
+        if (parent instanceof ViewGroup group) {
+            group.removeView(mFirstPagePinnedItem);
+        }
+        if (!firstPage.addViewToCellLayout(mFirstPagePinnedItem, 0,
+                R.id.reserved_container_workspace, lp, true)) {
+            Log.e(TAG, "Failed to re-add QuickSpace to the first page");
+        }
     }
 
     public void removeAllWorkspaceScreens() {
@@ -1571,6 +1635,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         mWallpaperOffset.setWindowToken(getWindowToken());
+        refreshFirstPageWidget();
         computeScroll();
         mLauncher.getStateManager().addStateListener(mAccessibilityDropListener);
         mLayoutTransition.addTransitionListener(mTransitionListener);
@@ -3693,7 +3758,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             // Iterate in reverse order as we are removing items
             for (int i = container.getChildCount() - 1; i >= 0; i--) {
                 View child = container.getChildAt(i);
-                ItemInfo info = (ItemInfo) child.getTag();
+                if (!(child.getTag() instanceof ItemInfo info)) continue;
 
                 if (matcher.test(info)) {
                     layout.removeViewInLayout(child);

@@ -504,6 +504,18 @@ constructor(
         val occupied = GridOccupancy(trgX, trgY)
         val trg = Point(trgX, trgY)
         val next = Point(0, 0)
+        if (
+            screenId == com.android.launcher3.Workspace.FIRST_SCREEN_ID &&
+                LauncherPrefs.SHOW_QUICKSPACE.get(context)
+        ) {
+            occupied.markCells(
+                0,
+                0,
+                trgX,
+                com.android.launcher3.Workspace.getQuickSpaceSpanY(context, trgY),
+                true,
+            )
+        }
         if (existedEntries != null) {
             for (entry in existedEntries) {
                 occupied.markCells(entry, true)

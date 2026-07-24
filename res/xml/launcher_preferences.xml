@@ -89,6 +89,99 @@
     </androidx.preference.PreferenceCategory>
 
     <androidx.preference.PreferenceCategory
+        android:key="quickspace_category"
+        android:title="@string/quickspace_category_title">
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace"
+            android:title="@string/show_quickspace_title"
+            android:summary="@string/show_quickspace_summary"
+            android:defaultValue="false" />
+
+        <ListPreference
+            android:key="pref_quickspace_style"
+            android:title="@string/quickspace_style_title"
+            android:summary="%s"
+            android:dependency="pref_quickspace"
+            android:entries="@array/quickspace_style_entries"
+            android:entryValues="@array/quickspace_style_values"
+            android:defaultValue="0" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_voltage_accent"
+            android:title="@string/quickspace_voltage_accent_title"
+            android:summary="@string/quickspace_voltage_accent_summary"
+            android:dependency="pref_quickspace"
+            android:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_voltage_minimal"
+            android:title="@string/quickspace_voltage_minimal_title"
+            android:summary="@string/quickspace_voltage_minimal_summary"
+            android:dependency="pref_quickspace"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_psonality"
+            android:title="@string/quickspace_psa_title"
+            android:summary="@string/quickspace_psa_summary"
+            android:dependency="pref_quickspace"
+            android:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_np"
+            android:title="@string/quickspace_now_playing_title"
+            android:summary="@string/quickspace_now_playing_summary"
+            android:dependency="pref_quickspace"
+            android:defaultValue="true" />
+
+        <ListPreference
+            android:key="pref_quickspace_player_style"
+            android:title="@string/quickspace_player_style_title"
+            android:summary="@string/quickspace_player_style_summary"
+            android:dependency="pref_quickspace_np"
+            android:entries="@array/quickspace_player_style_entries"
+            android:entryValues="@array/quickspace_player_style_values"
+            android:defaultValue="0" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_weather"
+            android:title="@string/quick_event_ambient_weather_title"
+            android:summary="@string/quick_event_ambient_weather_summary"
+            android:dependency="pref_quickspace"
+            android:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_weather_city"
+            android:title="@string/quick_event_weather_city_title"
+            android:summary="@string/quick_event_weather_city_summary"
+            android:dependency="pref_quickspace_weather"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_weather_text"
+            android:title="@string/quick_event_weather_text_title"
+            android:summary="@string/quick_event_weather_text_summary"
+            android:dependency="pref_quickspace_weather"
+            android:defaultValue="true" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_battery"
+            android:title="@string/quickspace_battery_title"
+            android:summary="@string/quickspace_battery_summary"
+            android:dependency="pref_quickspace"
+            android:defaultValue="false" />
+
+        <SwitchPreferenceCompat
+            android:key="pref_quickspace_calendar"
+            android:title="@string/quickspace_calendar_title"
+            android:summary="@string/quickspace_calendar_summary"
+            android:dependency="pref_quickspace"
+            android:defaultValue="false" />
+
+    </androidx.preference.PreferenceCategory>
+
+    <androidx.preference.PreferenceCategory
         android:key="icon_category"
         android:title="@string/category_icon">
 

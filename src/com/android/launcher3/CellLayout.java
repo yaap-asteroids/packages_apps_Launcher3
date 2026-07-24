@@ -2009,7 +2009,7 @@ public class CellLayout extends ViewGroup {
         final int itemCount = mShortcutsAndWidgets.getChildCount();
         for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
             View item = mShortcutsAndWidgets.getChildAt(itemIdx);
-            if (op.evaluate((ItemInfo) item.getTag(), item)) {
+            if (item.getTag() instanceof ItemInfo info && op.evaluate(info, item)) {
                 return item;
             }
         }

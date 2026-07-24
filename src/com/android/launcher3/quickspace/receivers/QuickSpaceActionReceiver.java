@@ -1,0 +1,130 @@
+/*
+ * Copyright (C) 2018-2025 crDroid Android Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.android.launcher3.quickspace.receivers;
+
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
+import android.content.ContentUris;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.LauncherApps;
+import android.net.Uri;
+import android.os.Process;
+import android.provider.CalendarContract;
+import android.view.View;
+import android.view.View.OnClickListener;
+import com.android.launcher3.Launcher;
+
+public class QuickSpaceActionReceiver {
+
+  private final Context mContext;
+  private final LauncherApps mLauncherApps;
+
+  public OnClickListener mCalendarClickListener;
+
+  public QuickSpaceActionReceiver(Context context) {
+    this.mContext = context;
+    mLauncherApps = context.getSystemService(LauncherApps.class);
+
+    mCalendarClickListener =
+        new OnClickListener() {
+          @Override
+          public void onClick(View view) {
+            openCalendar(view);
+          }
+        };
+  }
+
+  private void openCalendar(View view) {
+    final Uri content_URI = CalendarContract.CONTENT_URI;
+    final Uri.Builder appendPath = content_URI.buildUpon().appendPath("time");
+    ContentUris.appendId(appendPath, System.currentTimeMillis());
+    final Intent addFlags =
+        new Intent(Intent.ACTION_VIEW)
+            .setData(appendPath.build())
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+    try {
+      Launcher.getLauncher(mContext).startActivitySafely(view, addFlags, null);
+    } catch (ActivityNotFoundException ex) {
+      Intent calendarIntent =
+          new Intent(Intent.ACTION_MAIN)
+              .addCategory(Intent.CATEGORY_APP_CALENDAR)
+              .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+      Launcher.getLauncher(mContext).startActivitySafely(view, calendarIntent, null);
+    }
+  }
+
+  private void openCalendarEvent(View view, long eventId) {
+    Intent intent =
+        new Intent(Intent.ACTION_VIEW)
+            .setData(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+    try {
+      Launcher.getLauncher(mContext).startActivitySafely(view, intent, null);
+    } catch (ActivityNotFoundException ex) {
+      openCalendar(view);
+    }
+  }
+
+  private void openGoogleWeather(View view) {
+    Intent intent = new Intent("android.intent.action.VIEW");
+    intent.setData(Uri.parse("dynact://velour/weather/ProxyActivity"));
+    intent.setComponent(
+        new ComponentName(
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.apps.gsa.velour.DynamicActivityTrampoline"));
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+    try {
+      Launcher.getLauncher(mContext).startActivitySafely(view, intent, null);
+    } catch (ActivityNotFoundException ex) {
+      mLauncherApps.startAppDetailsActivity(
+          new ComponentName(
+              "com.google.android.googlequicksearchbox",
+              "com.google.android.apps.gsa.velour.DynamicActivityTrampoline"),
+          Process.myUserHandle(),
+          null,
+          null);
+    }
+  }
+
+  private void openOmniWeather(View view) {
+    Intent intent = new Intent();
+    intent.setComponent(
+        new ComponentName("org.omnirom.omnijaws", "org.omnirom.omnijaws.WeatherActivity"));
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+    try {
+      Launcher.getLauncher(mContext).startActivitySafely(view, intent, null);
+    } catch (ActivityNotFoundException ex) {
+      // Do nothing
+    }
+  }
+
+  public OnClickListener getCalendarAction() {
+    return mCalendarClickListener;
+  }
+
+  public OnClickListener getCalendarEventAction(long eventId) {
+    return view -> openCalendarEvent(view, eventId);
+  }
+
+  public OnClickListener getWeatherAction(boolean hasGoogleApp) {
+    if (hasGoogleApp) {
+      return view -> openGoogleWeather(view);
+    } else {
+      return view -> openOmniWeather(view);
+    }
+  }
+}

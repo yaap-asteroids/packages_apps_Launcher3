@@ -25,6 +25,7 @@ import static com.android.launcher3.InvariantDeviceProfile.TYPE_MULTI_DISPLAY;
 import static com.android.launcher3.InvariantDeviceProfile.TYPE_TABLET;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -195,6 +196,17 @@ public class SettingsActivity extends FragmentActivity
     public static class LauncherSettingsFragment extends SettingsBasePreferenceFragment {
 
         private @Nullable SafeCloseable mSettingCacheSafeCloseable;
+        private final androidx.activity.result.ActivityResultLauncher<String[]> mQuickSpacePermissions =
+                registerForActivityResult(
+                        new androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+                        result -> {
+                            boolean calendarGranted = Boolean.TRUE.equals(
+                                    result.get(Manifest.permission.READ_CALENDAR));
+                            if (result.containsKey(Manifest.permission.READ_CALENDAR) && !calendarGranted) {
+                                SwitchPreferenceCompat calendar = findPreference("pref_quickspace_calendar");
+                                if (calendar != null) calendar.setChecked(false);
+                            }
+                        });
 
         protected boolean mDeveloperOptionsEnabled = false;
 
@@ -345,6 +357,19 @@ public class SettingsActivity extends FragmentActivity
         protected boolean initPreference(Preference preference) {
             LauncherDisplayInfo info = DisplayController.INSTANCE.get(getContext()).getInfo();
             switch (preference.getKey()) {
+                case "pref_quickspace_calendar":
+                case "pref_quickspace_battery":
+                    String permission = "pref_quickspace_calendar".equals(preference.getKey())
+                            ? Manifest.permission.READ_CALENDAR : Manifest.permission.BLUETOOTH_CONNECT;
+                    preference.setOnPreferenceChangeListener((pref, value) -> {
+                        if (Boolean.TRUE.equals(value)
+                                && requireContext().checkSelfPermission(permission)
+                                        != PackageManager.PERMISSION_GRANTED) {
+                            mQuickSpacePermissions.launch(new String[] {permission});
+                        }
+                        return true;
+                    });
+                    return true;
                 case NOTIFICATION_DOTS_PREFERENCE_KEY:
                     return BuildConfig.NOTIFICATION_DOTS_ENABLED;
                 case DEVELOPER_OPTIONS_KEY:

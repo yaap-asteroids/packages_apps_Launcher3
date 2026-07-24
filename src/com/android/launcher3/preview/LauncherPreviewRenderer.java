@@ -56,6 +56,7 @@ import com.android.launcher3.InsettableFrameLayout;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherPrefs;
+import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.R;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.WorkspaceLayoutManager;
@@ -372,6 +373,21 @@ public class LauncherPreviewRenderer extends BaseContext
                 .filter(currentScreenContentFilter(IntSet.wrap(mWorkspaceScreens.keySet())))
                 .forEach(this::inflateAndAdd);
         populateHotseatPredictions(itemIdMap);
+
+        // Add first page QuickSpace
+        if (LauncherPrefs.SHOW_QUICKSPACE.get(this)) {
+            CellLayout firstScreen = mWorkspaceScreens.get(Workspace.FIRST_SCREEN_ID);
+            if (firstScreen != null) {
+                View qsb = mHomeElementInflater.inflate(
+                        R.layout.reserved_container_workspace, firstScreen, false);
+                qsb.setId(R.id.reserved_container_workspace);
+                CellLayoutLayoutParams lp = new CellLayoutLayoutParams(0, 0,
+                        firstScreen.getCountX(),
+                        Workspace.getQuickSpaceSpanY(this, firstScreen.getCountY()));
+                lp.canReorder = false;
+                firstScreen.addViewToCellLayout(qsb, 0, R.id.reserved_container_workspace, lp, true);
+            }
+        }
 
         measureAndLayoutRootView();
         dispatchVisibilityAggregated(mRootView, true);

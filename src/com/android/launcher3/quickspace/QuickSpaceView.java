@@ -1,0 +1,2157 @@
+/*
+ * Copyright (C) 2018-2025 crDroid Android Project
+ * Copyright (C) 2025-2026 VoltageOS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.android.launcher3.quickspace;
+
+import android.animation.ValueAnimator;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
+import android.content.ContentUris;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.icu.text.DateFormat;
+import android.net.Uri;
+import android.provider.AlarmClock;
+import android.provider.CalendarContract;
+import android.text.TextUtils;
+import android.text.TextUtils.TruncateAt;
+import android.util.AttributeSet;
+import android.view.HapticFeedbackConstants;
+import android.view.LayoutInflater;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewPropertyAnimator;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
+import android.view.animation.PathInterpolator;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import com.android.launcher3.BubbleTextView;
+import com.android.launcher3.LauncherPrefs;
+import com.android.launcher3.R;
+import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.quickspace.QuickspaceController.OnDataListener;
+import com.android.launcher3.quickspace.receivers.QuickSpaceActionReceiver;
+import com.android.launcher3.quickspace.views.AccentedTextClock;
+import com.android.launcher3.quickspace.views.VoltageVerticalView;
+import com.android.launcher3.util.Themes;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
+public class QuickSpaceView extends FrameLayout implements OnDataListener {
+
+  private static final String TAG = "Launcher3:QuickSpaceView";
+
+  private static final int BATTERY_FULL_THRESHOLD = 95;
+  private static final int BATTERY_LOW_THRESHOLD = 20;
+  private static final int BATTERY_CRITICAL_THRESHOLD = 10;
+  private static final long SHIMMER_DURATION_MS = 2800;
+  private static final float SHIMMER_WIDTH_RATIO = 0.30f;
+  private static final int MIN_SHIMMER_WIDTH_DP = 30;
+  private static final int BATTERY_CHANGE_THRESHOLD = 5;
+  private static final int COLOR_TRANSITION_DURATION = 200;
+  private static final int ANIMATE_IN_DURATION = 200;
+  private static final int ANIMATE_OUT_DURATION = 250;
+  private static final int BATTERY_PROGRESS_DURATION = 350;
+  private static final int DEVICE_SWITCH_DURATION = 160;
+  private static final int MINIMAL_ITEM_NONE = 0;
+  private static final int MINIMAL_ITEM_WEATHER = 1;
+  private static final int MINIMAL_ITEM_NOW_PLAYING = 2;
+  private static final int MINIMAL_ITEM_BATTERY = 3;
+  private static final int MINIMAL_ITEM_PSA = 4;
+  private static final int MINIMAL_ITEM_CALENDAR = 5;
+
+  public ColorStateList mColorStateList;
+  public BubbleTextView mBubbleTextView;
+  public final int mQuickspaceBackgroundRes;
+
+  public ViewGroup mQuickspaceContent;
+  public ImageView mEventSubIcon;
+  public ImageView mNowPlayingIcon;
+  public TextView mEventTitleSub;
+  public ViewGroup mSubtitleLine;
+
+  public TextView mQuickspaceDayOfWeek;
+  public AccentedTextClock mQuickspaceClock;
+  public TextView mQuickspaceDate;
+  public TextView mPSAMessage;
+  public ViewGroup mNowPlayingContent;
+  public TextView mNowPlayingText;
+  public ViewGroup mContextualInfoRow;
+
+  public ViewGroup mBatteryRow;
+  public View mBatteryProgress;
+  public TextView mBatteryDeviceName;
+  public TextView mBatteryPercentage;
+  public ImageView mBatteryIcon;
+  public LinearLayout mBatteryDotsContainer;
+  public ImageView mBatteryChargingOverlay;
+  public View mBatteryShimmer;
+
+  public TextView mEventTitleSubColored;
+  public TextView mGreetingsExt;
+  public TextView mGreetingsExtClock;
+  public ViewGroup mWeatherContentSub;
+  public ImageView mWeatherIconSub;
+  public TextView mWeatherTempSub;
+  public View mWeatherDivider;
+  public View mCalendarContent;
+  public ImageView mCalendarIcon;
+  public TextView mCalendarText;
+  public ViewGroup mMinimalIconsRow;
+  public View mMinimalWeatherChip;
+  public ImageView mMinimalWeatherChipIcon;
+  public View mMinimalNowPlayingChip;
+  public ImageView mMinimalNowPlayingChipIcon;
+  public View mMinimalBatteryChip;
+  public ImageView mMinimalBatteryChipIcon;
+  public View mMinimalPsaChip;
+  public ImageView mMinimalPsaChipIcon;
+  public View mMinimalCalendarChip;
+  public ImageView mMinimalCalendarChipIcon;
+  public ViewGroup mExpandedWeatherRow;
+  public ImageView mExpandedWeatherIcon;
+  public TextView mExpandedWeatherTemp;
+  public TextView mEventTitle;
+
+  public boolean mIsQuickEvent;
+  public boolean mFinishedInflate;
+  public boolean mWeatherAvailable;
+  public boolean mAttached;
+  private boolean mListening;
+  private boolean mHostResumed;
+  private boolean mAggregatedVisible = true;
+  private volatile boolean mDestroyed = false;
+  private volatile boolean mPendingDestroy = false;
+
+  private boolean mIsAlternateStyle = false;
+  private boolean mLastAccentState;
+  private boolean mLastBlackTextState = false;
+  private boolean mLastMinimalModeState = false;
+  private boolean mViewsLoaded = false;
+  private boolean mVisualDirty = true;
+  private View mPlayerPlayPause;
+  private String mLastEventTitle = "";
+  private String mLastWeatherTemp = "";
+  private boolean mLastNowPlayingState = false;
+  private String mLastPSAMessage = "";
+  private String mLastActionTitle = "";
+  private int mLastBatteryLevel = -1;
+  private int mLastDeviceCount = 0;
+  private String mLastDeviceAddress = null;
+  private boolean mLastChargingState = false;
+  private boolean mBatteryAlphaRestoreNeeded = false;
+
+  private final Map<Integer, String> mMarqueeTexts = new HashMap<>();
+
+  private ViewPropertyAnimator mCurrentAnimateIn;
+  private ViewPropertyAnimator mCurrentAnimateOut;
+  private ValueAnimator mBatteryProgressAnimator;
+  private ValueAnimator mShimmerAnimator;
+
+  private Drawable mLastActionIcon;
+  private int mLastEventTitleHash = 0;
+  private int mLastWeatherTempHash = 0;
+  private int mLastActionTitleHash = 0;
+  private int mLastPsaMessageHash = 0;
+  private long mLastCalendarEventId = -1;
+  private int mLastCalendarEventHash = 0;
+  private long mLastUpdateTime = 0;
+
+  private QuickSpaceActionReceiver mActionReceiver;
+
+  private ColorStateList mCachedColorStateList;
+  private boolean mCachedUseBlackText = false;
+
+  private final android.content.BroadcastReceiver mWallpaperChangeReceiver =
+      new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(android.content.Context context, android.content.Intent intent) {
+          if (android.content.Intent.ACTION_WALLPAPER_CHANGED.equals(intent.getAction())) {
+            post(
+                () -> {
+                  if (!mDestroyed) {
+                    refreshColorStateList();
+                    updateColorForViews();
+                  }
+                });
+          }
+        }
+      };
+
+  private boolean mIsLayoutSuppressed = false;
+  private final Runnable mDeferredUpdateRunnable =
+      new Runnable() {
+        @Override
+        public void run() {
+          performDeferredUpdate();
+        }
+      };
+
+  public QuickspaceController mController;
+
+  private int mCurrentStyle = -1;
+  private int mExpandedMinimalItem = MINIMAL_ITEM_NONE;
+  private QuickSpaceStyleBinder mBinder;
+
+  public QuickSpaceView(Context context, AttributeSet set) {
+    super(context, set);
+    mController = new QuickspaceController(context);
+    refreshColorStateList();
+    mQuickspaceBackgroundRes = R.drawable.bg_quickspace;
+    setClipChildren(false);
+    setClipToPadding(false);
+  }
+
+  @Override
+  public void onDataUpdated() {
+    if (mDestroyed || !mAttached) {
+      return;
+    }
+
+    removeCallbacks(mDeferredUpdateRunnable);
+    postDelayed(mDeferredUpdateRunnable, 16);
+  }
+
+  private void performDeferredUpdate() {
+    if (mDestroyed) {
+      return;
+    }
+
+    int style = QuickSpacePreferences.getStyle(getContext());
+    boolean styleChanged = mCurrentStyle != style;
+    boolean useBlackText =
+        LauncherPrefs.getPrefs(getContext()).getBoolean("pref_quickspace_black_text", false);
+    boolean colorChanged = mLastBlackTextState != useBlackText;
+    boolean minimalMode = isVoltageMinimalEnabled(style);
+    boolean minimalModeChanged = mLastMinimalModeState != minimalMode;
+
+    if (!mViewsLoaded || styleChanged) {
+      prepareLayout(style);
+      mViewsLoaded = true;
+    }
+    mIsQuickEvent = mController.isQuickEvent();
+    mWeatherAvailable = mController.isWeatherAvailable();
+    boolean dataChanged = hasDataChanged();
+
+    if (mVisualDirty || styleChanged || dataChanged || colorChanged || minimalModeChanged) {
+      mVisualDirty = false;
+      if (styleChanged || dataChanged || minimalModeChanged) {
+        mExpandedMinimalItem = MINIMAL_ITEM_NONE;
+      }
+      updateView(style);
+      getQuickSpaceView();
+
+      if (!mIsLayoutSuppressed) {
+        if (styleChanged || dataChanged || minimalModeChanged) {
+          post(
+              () -> {
+                if (!mDestroyed && mQuickspaceContent != null) {
+                  requestLayout();
+                }
+              });
+        }
+        refreshColorStateList();
+        updateColorForViews();
+      }
+
+      mLastBlackTextState = useBlackText;
+      mLastMinimalModeState = minimalMode;
+    }
+  }
+
+  private boolean isLargeStyle(int style) {
+    return style == 2 || style == 3 || style == 5 || style == 6;
+  }
+
+  private boolean isVoltageMinimalEnabled(int style) {
+    return isLargeStyle(style) && LauncherPrefs.QUICKSPACE_VOLTAGE_MINIMAL.get(getContext());
+  }
+
+  private void updateView(int style) {
+    if (mDestroyed || mPendingDestroy) {
+      return;
+    }
+
+    switch (style) {
+      case 4:
+        if (mBinder != null) {
+          mBinder.onDataUpdated(!mIsLayoutSuppressed);
+        }
+        break;
+      case 5:
+      case 6:
+      case 2:
+      case 3:
+        loadLargeStyle();
+        break;
+      case 1:
+      case 0:
+      default:
+        loadDoubleLine(style == 1);
+        break;
+    }
+  }
+
+  private boolean hasDataChanged() {
+    if (mDestroyed || mPendingDestroy) {
+      return false;
+    }
+
+    if (mController == null) {
+      return false;
+    }
+
+    QuickEventsController eventController = mController.getEventController();
+    if (eventController == null) {
+      return false;
+    }
+
+    QuickCalendarController calendarController = mController.getCalendarController();
+    QuickCalendarController.CalendarEvent calendarEvent =
+        calendarController == null ? null : calendarController.getEvent();
+    long calendarId = calendarEvent == null ? -1 : calendarEvent.getId();
+    int calendarHash =
+        calendarEvent == null
+            ? 0
+            : (calendarEvent.getTitle()
+                    + '|'
+                    + calendarEvent.getStartTime()
+                    + '|'
+                    + calendarEvent.getEndTime()
+                    + '|'
+                    + calendarEvent.isAllDay())
+                .hashCode();
+    boolean calendarChanged =
+        mLastCalendarEventId != calendarId || mLastCalendarEventHash != calendarHash;
+
+    long currentTime = System.currentTimeMillis();
+
+    boolean currentNowPlayingState = eventController.isNowPlaying();
+    if (mLastNowPlayingState != currentNowPlayingState) {
+      mLastNowPlayingState = currentNowPlayingState;
+      mLastUpdateTime = currentTime;
+      mLastCalendarEventId = calendarId;
+      mLastCalendarEventHash = calendarHash;
+      return true;
+    }
+
+    String currentEventTitle = eventController.getTitle();
+    int eventTitleHash = currentEventTitle != null ? currentEventTitle.hashCode() : 0;
+
+    String currentWeatherState = mController.getWeatherStateKey();
+    int weatherTempHash = currentWeatherState != null ? currentWeatherState.hashCode() : 0;
+
+    String currentActionTitle = eventController.getActionTitle();
+    int actionTitleHash = currentActionTitle != null ? currentActionTitle.hashCode() : 0;
+
+    String currentPsaMessage = eventController.getPSAMessage();
+    int psaMessageHash = currentPsaMessage != null ? currentPsaMessage.hashCode() : 0;
+
+    int batteryLevel =
+        mController.getBatteryController() != null
+            ? mController.getBatteryController().getBatteryLevel()
+            : -1;
+    boolean isCharging =
+        mController.getBatteryController() != null
+            && mController.getBatteryController().isCharging();
+
+    boolean batteryVisible = batteryLevel >= 0;
+    boolean lastBatteryVisible = mLastBatteryLevel >= 0;
+    int deviceCount =
+        mController.getBatteryController() != null
+            ? mController.getBatteryController().getDeviceCount()
+            : 0;
+    String batteryAddress = mController.getBatteryController().getCurrentDeviceAddress();
+
+    Drawable actionIcon = eventController.getActionIcon();
+    boolean changed =
+        mLastActionIcon != actionIcon
+            || mLastEventTitleHash != eventTitleHash
+            || mLastWeatherTempHash != weatherTempHash
+            || mLastActionTitleHash != actionTitleHash
+            || mLastPsaMessageHash != psaMessageHash
+            || mLastBatteryLevel != batteryLevel
+            || batteryVisible != lastBatteryVisible
+            || mLastDeviceCount != deviceCount
+            || !TextUtils.equals(mLastDeviceAddress, batteryAddress)
+            || mLastChargingState != isCharging
+            || calendarChanged;
+
+    if (changed) {
+      mLastActionIcon = actionIcon;
+      mLastEventTitleHash = eventTitleHash;
+      mLastWeatherTempHash = weatherTempHash;
+      mLastActionTitleHash = actionTitleHash;
+      mLastPsaMessageHash = psaMessageHash;
+      mLastBatteryLevel = batteryLevel;
+      mLastChargingState = isCharging;
+      mLastUpdateTime = currentTime;
+      mLastDeviceCount = deviceCount;
+      mLastCalendarEventId = calendarId;
+      mLastCalendarEventHash = calendarHash;
+
+      mLastEventTitle = currentEventTitle != null ? currentEventTitle : "";
+      mLastWeatherTemp = currentWeatherState != null ? currentWeatherState : "";
+      mLastActionTitle = currentActionTitle != null ? currentActionTitle : "";
+    }
+
+    return changed;
+  }
+
+  private final void loadDoubleLine(boolean useAlternativeQuickspaceUI) {
+    if (mDestroyed || mPendingDestroy) {
+      return;
+    }
+
+    if (mIsLayoutSuppressed) {
+      return;
+    }
+
+    if (mController == null || mController.getEventController() == null) {
+      return;
+    }
+
+    beginBatchEdit();
+
+    if (getBackground() == null) {
+      setBackgroundResource(mQuickspaceBackgroundRes);
+    }
+
+    QuickEventsController eventController = mController.getEventController();
+
+    String eventTitle = mController.getEventController().getTitle();
+    updateTextViewIfNeeded(mEventTitle, eventTitle, false);
+
+    if (useAlternativeQuickspaceUI) {
+      String greetingsExt = mController.getEventController().getGreetings();
+      updateTextViewIfNeeded(mGreetingsExt, greetingsExt, true);
+      if (mGreetingsExt.getVisibility() == View.VISIBLE) {
+        mGreetingsExt.setEllipsize(TruncateAt.END);
+        mGreetingsExt.setOnClickListener(mController.getEventController().getAction());
+      }
+      String greetingsExtClock = mController.getEventController().getClockExt();
+      updateTextViewIfNeeded(mGreetingsExtClock, greetingsExtClock, true);
+      if (mGreetingsExtClock.getVisibility() == View.VISIBLE) {
+        mGreetingsExtClock.setOnClickListener(mController.getEventController().getAction());
+      }
+    }
+    boolean shouldShowPsa =
+        mIsQuickEvent
+            && (LauncherPrefs.SHOW_QUICKSPACE_PSONALITY.get(getContext())
+                || mController.getEventController().isNowPlaying());
+
+    updatePsaContent(shouldShowPsa, useAlternativeQuickspaceUI);
+    updateWeatherContent();
+
+    endBatchEdit();
+  }
+
+  private void updatePsaContent(boolean shouldShowPsa, boolean useAlternativeQuickspaceUI) {
+    if (shouldShowPsa && mSubtitleLine != null) {
+      mSubtitleLine.setVisibility(View.VISIBLE);
+    }
+
+    if (shouldShowPsa) {
+      maybeSetMarquee(mEventTitle);
+      mEventTitle.setOnClickListener(mController.getEventController().getAction());
+
+      String actionTitle = mController.getEventController().getActionTitle();
+      updateTextViewIfNeeded(mEventTitleSub, actionTitle, false);
+      maybeSetMarquee(mEventTitleSub);
+      mEventTitleSub.setOnClickListener(mController.getEventController().getAction());
+
+      animateIn(mEventTitleSub);
+
+      if (useAlternativeQuickspaceUI) {
+        updateNowPlayingState();
+      } else {
+        setEventSubIcon();
+      }
+    } else {
+      animateOut(mEventTitleSub);
+      animateOut(mEventSubIcon);
+      if (useAlternativeQuickspaceUI) {
+        animateOut(mEventTitleSubColored);
+        animateOut(mNowPlayingIcon);
+      }
+    }
+  }
+
+  private void updateNowPlayingState() {
+    if (mController.getEventController().isNowPlaying()) {
+      animateOut(mEventSubIcon);
+      animateIn(mEventTitleSubColored);
+      animateIn(mNowPlayingIcon);
+
+      String nowPlayingText = getContext().getString(R.string.qe_now_playing_by);
+      updateTextViewIfNeeded(mEventTitleSubColored, nowPlayingText, false);
+      mEventTitleSubColored.setOnClickListener(mController.getEventController().getAction());
+    } else {
+      setEventSubIcon();
+      animateOut(mEventTitleSubColored);
+      animateOut(mNowPlayingIcon);
+    }
+  }
+
+  private void updateWeatherContent() {
+    bindWeather(mWeatherContentSub, mWeatherTempSub, mWeatherIconSub, false, null);
+  }
+
+  private void updateTextViewIfNeeded(
+      TextView textView, CharSequence newText, boolean setVisibility) {
+    if (textView == null) return;
+
+    boolean hasText = !TextUtils.isEmpty(newText);
+
+    int currentVisibility = textView.getVisibility();
+    CharSequence currentText = textView.getText();
+    int desiredVisibility = hasText ? View.VISIBLE : View.GONE;
+
+    if (setVisibility
+        && currentVisibility == desiredVisibility
+        && TextUtils.equals(currentText, newText)) {
+      return;
+    }
+
+    if (setVisibility) {
+      if (currentVisibility != desiredVisibility) {
+        textView.setVisibility(desiredVisibility);
+      }
+    }
+
+    if (!TextUtils.equals(currentText, newText)) {
+      textView.setText(newText);
+    }
+  }
+
+  private void maybeSetMarquee(TextView tv) {
+    if (tv == null || !mListening || tv.getMaxLines() > 1) return;
+    String currentText = tv.getText() != null ? tv.getText().toString() : "";
+    String lastText = mMarqueeTexts.get(tv.getId());
+    if (tv.getEllipsize() == TruncateAt.MARQUEE
+        && tv.isSelected()
+        && currentText.equals(lastText)) {
+      return;
+    }
+    mMarqueeTexts.put(tv.getId(), currentText);
+
+    tv.setSelected(false);
+    tv.setEllipsize(TruncateAt.END);
+    final float textWidth = tv.getPaint().measureText(currentText);
+    tv.post(
+        () -> {
+          android.text.Layout layout = tv.getLayout();
+          if (layout != null && layout.getEllipsizedWidth() < textWidth) {
+            tv.setEllipsize(TruncateAt.MARQUEE);
+            tv.setMarqueeRepeatLimit(-1);
+            tv.setSelected(true);
+          }
+        });
+  }
+
+  private void setEventSubIcon() {
+    if (mController == null || mController.getEventController() == null) {
+      return;
+    }
+
+    Drawable icon = mController.getEventController().getActionIcon();
+    if (icon != null) {
+      animateIn(mEventSubIcon);
+      mEventSubIcon.setImageTintList(
+          mController.getEventController().isNowPlaying() ? null : mColorStateList);
+      mEventSubIcon.setImageDrawable(icon);
+      mEventSubIcon.setOnClickListener(mController.getEventController().getAction());
+    } else {
+      animateOut(mEventSubIcon);
+    }
+  }
+
+  private final void bindWeather(
+      View container, TextView title, ImageView icon, boolean temperatureOnly, View divider) {
+    if (container == null || title == null || icon == null) return;
+
+    boolean preserveWeather = isVoltageMinimalEnabled(mCurrentStyle) || mCurrentStyle == 3;
+    if (!mWeatherAvailable
+        || (!preserveWeather && mController.getEventController().isNowPlaying())) {
+      hideWeatherViews(container, divider);
+      return;
+    }
+    String weatherTemp =
+        temperatureOnly ? mController.getWeatherTemperature() : mController.getWeatherTemp();
+    if (weatherTemp == null || weatherTemp.isEmpty()) {
+      hideWeatherViews(container, divider);
+      return;
+    }
+
+    animateIn(container);
+    if (divider != null) {
+      animateIn(divider);
+    }
+
+    updateTextViewIfNeeded(title, weatherTemp, false);
+
+    Drawable weatherIcon = mController.getWeatherIcon();
+    if (icon.getDrawable() != weatherIcon) {
+      icon.setImageDrawable(weatherIcon);
+    }
+  }
+
+  private void hideWeatherViews(View container, View divider) {
+    if (container != null && container.getVisibility() != View.GONE) {
+      container.setVisibility(View.GONE);
+    }
+    if (divider != null && divider.getVisibility() != View.GONE) {
+      divider.setVisibility(View.GONE);
+    }
+  }
+
+  private boolean shouldShowMinimalWeather() {
+    if (!mWeatherAvailable || mController == null || mController.getEventController() == null) {
+      return false;
+    }
+    String weatherText =
+        mCurrentStyle == 3 ? mController.getWeatherTemperature() : mController.getWeatherTemp();
+    return !TextUtils.isEmpty(weatherText);
+  }
+
+  private boolean shouldShowMinimalBattery() {
+    return LauncherPrefs.SHOW_QUICKSPACE_BATTERY.get(getContext())
+        && mController != null
+        && mController.getBatteryController() != null
+        && mController.getBatteryController().getBatteryLevel() >= 0;
+  }
+
+  private boolean shouldShowMinimalPsa() {
+    if (!mIsQuickEvent || !LauncherPrefs.SHOW_QUICKSPACE_PSONALITY.get(getContext())) {
+      return false;
+    }
+    return mController != null
+        && mController.getEventController() != null
+        && !TextUtils.isEmpty(mController.getEventController().getPSAMessage());
+  }
+
+  private boolean hasVisibleMinimalChip() {
+    return isViewVisible(mMinimalWeatherChip)
+        || isViewVisible(mMinimalNowPlayingChip)
+        || isViewVisible(mMinimalCalendarChip)
+        || isViewVisible(mMinimalBatteryChip)
+        || isViewVisible(mMinimalPsaChip);
+  }
+
+  private boolean isViewVisible(View view) {
+    return view != null && view.getVisibility() == View.VISIBLE;
+  }
+
+  private void toggleMinimalItem(int item) {
+    mExpandedMinimalItem = mExpandedMinimalItem == item ? MINIMAL_ITEM_NONE : item;
+    if (isLargeStyle(mCurrentStyle)) {
+      loadLargeStyle();
+      requestLayout();
+    }
+  }
+
+  private void bindMinimalChip(
+      View chip, ImageView icon, boolean visible, int item, String description) {
+    if (chip == null || icon == null) return;
+
+    if (!visible) {
+      chip.setVisibility(View.GONE);
+      chip.setOnClickListener(null);
+      chip.setContentDescription(null);
+      return;
+    }
+
+    chip.setVisibility(View.VISIBLE);
+    chip.setContentDescription(description);
+    chip.setOnClickListener(
+        v -> {
+          v.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK);
+          toggleMinimalItem(item);
+        });
+  }
+
+  private void updateMinimalIconRow(
+      boolean minimalMode,
+      boolean showWeather,
+      boolean showNowPlaying,
+      boolean showBattery,
+      boolean showPsa,
+      boolean showCalendar) {
+    if (mMinimalIconsRow == null) return;
+
+    if (!minimalMode) {
+      mMinimalIconsRow.setVisibility(View.GONE);
+      return;
+    }
+
+    bindMinimalChip(
+        mMinimalWeatherChip, mMinimalWeatherChipIcon, showWeather, MINIMAL_ITEM_WEATHER, "Weather");
+    bindMinimalChip(
+        mMinimalNowPlayingChip,
+        mMinimalNowPlayingChipIcon,
+        showNowPlaying,
+        MINIMAL_ITEM_NOW_PLAYING,
+        "Now playing");
+    bindMinimalChip(
+        mMinimalCalendarChip,
+        mMinimalCalendarChipIcon,
+        showCalendar,
+        MINIMAL_ITEM_CALENDAR,
+        "Calendar");
+    bindMinimalChip(
+        mMinimalBatteryChip, mMinimalBatteryChipIcon, showBattery, MINIMAL_ITEM_BATTERY, "Battery");
+    bindMinimalChip(mMinimalPsaChip, mMinimalPsaChipIcon, showPsa, MINIMAL_ITEM_PSA, "Message");
+
+    if ((mExpandedMinimalItem == MINIMAL_ITEM_WEATHER && !showWeather)
+        || (mExpandedMinimalItem == MINIMAL_ITEM_NOW_PLAYING && !showNowPlaying)
+        || (mExpandedMinimalItem == MINIMAL_ITEM_CALENDAR && !showCalendar)
+        || (mExpandedMinimalItem == MINIMAL_ITEM_BATTERY && !showBattery)
+        || (mExpandedMinimalItem == MINIMAL_ITEM_PSA && !showPsa)) {
+      mExpandedMinimalItem = MINIMAL_ITEM_NONE;
+    }
+
+    mMinimalIconsRow.setVisibility(hasVisibleMinimalChip() ? View.VISIBLE : View.GONE);
+    updateMinimalChipAppearance();
+  }
+
+  private void updateMinimalChipAppearance() {
+    if (mColorStateList == null) return;
+
+    updateMinimalChipAppearance(
+        mMinimalWeatherChip, mMinimalWeatherChipIcon, mExpandedMinimalItem == MINIMAL_ITEM_WEATHER);
+    updateMinimalChipAppearance(
+        mMinimalNowPlayingChip,
+        mMinimalNowPlayingChipIcon,
+        mExpandedMinimalItem == MINIMAL_ITEM_NOW_PLAYING);
+    updateMinimalChipAppearance(
+        mMinimalCalendarChip,
+        mMinimalCalendarChipIcon,
+        mExpandedMinimalItem == MINIMAL_ITEM_CALENDAR);
+    updateMinimalChipAppearance(
+        mMinimalBatteryChip, mMinimalBatteryChipIcon, mExpandedMinimalItem == MINIMAL_ITEM_BATTERY);
+    updateMinimalChipAppearance(
+        mMinimalPsaChip, mMinimalPsaChipIcon, mExpandedMinimalItem == MINIMAL_ITEM_PSA);
+  }
+
+  private void updateMinimalChipAppearance(View chip, ImageView icon, boolean selected) {
+    if (chip == null || icon == null || chip.getBackground() == null) return;
+
+    int baseColor = mColorStateList.getDefaultColor();
+    int backgroundAlpha = selected ? 92 : 56;
+    chip.getBackground()
+        .mutate()
+        .setTint(
+            Color.argb(
+                backgroundAlpha,
+                Color.red(baseColor),
+                Color.green(baseColor),
+                Color.blue(baseColor)));
+    icon.setImageTintList(mColorStateList);
+    chip.setAlpha(selected ? 1f : 0.92f);
+  }
+
+  private void bindExpandedWeatherRow(boolean visible, boolean temperatureOnly) {
+    if (mExpandedWeatherRow == null
+        || mExpandedWeatherTemp == null
+        || mExpandedWeatherIcon == null) {
+      return;
+    }
+
+    if (!visible) {
+      animateOut(mExpandedWeatherRow);
+      return;
+    }
+
+    boolean hasGoogleApp =
+        isPackageEnabled("com.google.android.googlequicksearchbox", getContext());
+    mExpandedWeatherRow.setOnClickListener(getActionReceiver().getWeatherAction(hasGoogleApp));
+    bindWeather(
+        mExpandedWeatherRow, mExpandedWeatherTemp, mExpandedWeatherIcon, temperatureOnly, null);
+  }
+
+  private boolean shouldShowCalendar() {
+    if (!LauncherPrefs.SHOW_QUICKSPACE_CALENDAR.get(getContext())) {
+      return false;
+    }
+    if (mController == null || mController.getCalendarController() == null) {
+      return false;
+    }
+    QuickCalendarController.CalendarEvent event = mController.getCalendarController().getEvent();
+    return event != null && !TextUtils.isEmpty(event.getTitle());
+  }
+
+  private String getCalendarText(QuickCalendarController.CalendarEvent event) {
+    if (event == null || TextUtils.isEmpty(event.getTitle())) return null;
+    Locale locale = getResources().getConfiguration().getLocales().get(0);
+    android.icu.util.TimeZone zone = android.icu.util.TimeZone.getDefault();
+    boolean use24Hour = android.text.format.DateFormat.is24HourFormat(getContext());
+    DateFormat dateFormat = DateFormat.getInstanceForSkeleton("MMMd", locale);
+    DateFormat timeFormat = DateFormat.getInstanceForSkeleton(use24Hour ? "Hm" : "hm", locale);
+    dateFormat.setTimeZone(zone);
+    timeFormat.setTimeZone(zone);
+    String today = dateFormat.format(System.currentTimeMillis());
+    if (event.isAllDay()) {
+      dateFormat.setTimeZone(android.icu.util.TimeZone.getTimeZone("UTC"));
+    }
+    String eventDate = dateFormat.format(event.getStartTime());
+    String prefix = eventDate.equals(today) ? "" : eventDate + " · ";
+    if (!event.isAllDay()) {
+      prefix += timeFormat.format(event.getStartTime()) + " · ";
+    }
+    return prefix + event.getTitle();
+  }
+
+  private void bindCalendarRow(boolean visible) {
+    if (mCalendarContent == null || mCalendarText == null) return;
+
+    QuickCalendarController calendarController =
+        mController == null ? null : mController.getCalendarController();
+    QuickCalendarController.CalendarEvent event =
+        calendarController == null ? null : calendarController.getEvent();
+    String calendarText = visible ? getCalendarText(event) : null;
+    if (TextUtils.isEmpty(calendarText)) {
+      animateOut(mCalendarContent);
+      return;
+    }
+
+    animateIn(mCalendarContent);
+    updateTextViewIfNeeded(mCalendarText, calendarText, false);
+    mCalendarContent.setContentDescription(calendarText);
+    mCalendarContent.setOnClickListener(
+        v -> {
+          if (mController == null) return;
+          QuickCalendarController calendar = mController.getCalendarController();
+          QuickCalendarController.CalendarEvent current =
+              calendar == null ? null : calendar.getEvent();
+          if (current != null) {
+            getActionReceiver().getCalendarEventAction(current.getId()).onClick(v);
+          } else {
+            getActionReceiver().getCalendarAction().onClick(v);
+          }
+        });
+    post(() -> maybeSetMarquee(mCalendarText));
+  }
+
+  private QuickSpaceActionReceiver getActionReceiver() {
+    if (mActionReceiver == null) {
+      mActionReceiver = new QuickSpaceActionReceiver(getContext());
+    }
+    return mActionReceiver;
+  }
+
+  private void loadLargeStyle() {
+    if (mDestroyed || mPendingDestroy) {
+      return;
+    }
+
+    if (mIsLayoutSuppressed) {
+      return;
+    }
+
+    if (mQuickspaceDayOfWeek == null || mBatteryRow == null) return;
+
+    if (mController == null || mController.getEventController() == null) {
+      return;
+    }
+
+    beginBatchEdit();
+
+    boolean accentEnabled = LauncherPrefs.QUICKSPACE_VOLTAGE_ACCENT.get(getContext());
+    if (mQuickspaceClock != null) {
+      if (mLastAccentState != accentEnabled) {
+        mQuickspaceClock.setAccentEnabled(accentEnabled);
+        mLastAccentState = accentEnabled;
+      }
+    }
+
+    if (mCurrentStyle == 3) {
+      String fullDate = QuickEventsController.getFullDateLine(getContext());
+      updateTextViewIfNeeded(mQuickspaceDayOfWeek, fullDate, false);
+      if (mQuickspaceDate != null && mQuickspaceDate.getVisibility() != View.GONE) {
+        mQuickspaceDate.setVisibility(View.GONE);
+      }
+    } else {
+      String dayOfWeek = QuickEventsController.getDayOfWeek(getContext());
+      updateTextViewIfNeeded(mQuickspaceDayOfWeek, dayOfWeek, false);
+
+      String shortDate = mController.getEventController().getShortDate(getContext());
+      updateTextViewIfNeeded(mQuickspaceDate, shortDate, false);
+      if (mQuickspaceDate != null && mQuickspaceDate.getVisibility() != View.VISIBLE) {
+        mQuickspaceDate.setVisibility(View.VISIBLE);
+      }
+    }
+
+    View.OnClickListener openClockListener =
+        v -> {
+          try {
+            getContext()
+                .startActivity(
+                    new Intent(AlarmClock.ACTION_SHOW_ALARMS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+          } catch (ActivityNotFoundException e) {
+            e.printStackTrace();
+          }
+        };
+
+    View.OnClickListener openCalendarListener =
+        v -> {
+          try {
+            Uri.Builder builder = CalendarContract.CONTENT_URI.buildUpon();
+            builder.appendPath("time");
+            ContentUris.appendId(builder, System.currentTimeMillis());
+            Intent intent = new Intent(Intent.ACTION_VIEW).setData(builder.build());
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+          } catch (ActivityNotFoundException e) {
+            e.printStackTrace();
+          }
+        };
+
+    mQuickspaceClock.setOnClickListener(openClockListener);
+    mQuickspaceDayOfWeek.setOnClickListener(openClockListener);
+    mQuickspaceDate.setOnClickListener(openCalendarListener);
+
+    boolean isNowPlaying = mController.getEventController().isNowPlaying();
+    boolean minimalMode = isVoltageMinimalEnabled(mCurrentStyle);
+    boolean minimizeWeather = minimalMode && mCurrentStyle != 3;
+    boolean showWeatherChip = minimizeWeather && shouldShowMinimalWeather();
+    boolean showBattery = LauncherPrefs.SHOW_QUICKSPACE_BATTERY.get(getContext());
+    boolean showBatteryChip = shouldShowMinimalBattery();
+    boolean showPsaChip = shouldShowMinimalPsa();
+    boolean showCalendarChip = minimalMode && shouldShowCalendar();
+    QuickBatteryController batController = mController.getBatteryController();
+
+    updateMinimalIconRow(
+        minimalMode, showWeatherChip, isNowPlaying, showBatteryChip, showPsaChip, showCalendarChip);
+
+    if (minimizeWeather) {
+      hideWeatherViews(mWeatherContentSub, mWeatherDivider);
+      bindExpandedWeatherRow(
+          mExpandedMinimalItem == MINIMAL_ITEM_WEATHER && showWeatherChip, mCurrentStyle == 3);
+    } else {
+      if (mExpandedWeatherRow != null) {
+        mExpandedWeatherRow.setVisibility(View.GONE);
+      }
+      bindWeather(
+          mWeatherContentSub,
+          mWeatherTempSub,
+          mWeatherIconSub,
+          mCurrentStyle == 3,
+          mWeatherDivider);
+    }
+
+    bindCalendarRow(
+        shouldShowCalendar() && (!minimalMode || mExpandedMinimalItem == MINIMAL_ITEM_CALENDAR));
+
+    boolean showExpandedNowPlaying =
+        isNowPlaying && (!minimalMode || mExpandedMinimalItem == MINIMAL_ITEM_NOW_PLAYING);
+    boolean showExpandedPsa =
+        showPsaChip && (!minimalMode || mExpandedMinimalItem == MINIMAL_ITEM_PSA);
+
+    if (showExpandedNowPlaying) {
+      animateIn(mContextualInfoRow);
+      if (mPSAMessage.getVisibility() != View.GONE) {
+        mPSAMessage.setVisibility(View.GONE);
+      }
+      if (mNowPlayingContent.getVisibility() != View.VISIBLE) {
+        mNowPlayingContent.setVisibility(View.VISIBLE);
+      }
+
+      if (mController == null || mController.getEventController() == null) {
+        endBatchEdit();
+        return;
+      }
+
+      applyPlayerStyle();
+      mNowPlayingContent.setOnClickListener(
+          v -> {
+            if (mController != null && mController.getEventController() != null) {
+              View.OnClickListener action = mController.getEventController().getAction();
+              if (action != null) {
+                action.onClick(v);
+              }
+            }
+          });
+      post(() -> maybeSetMarquee(mNowPlayingText));
+    } else {
+      if (mNowPlayingContent.getVisibility() != View.GONE) {
+        mNowPlayingContent.setVisibility(View.GONE);
+      }
+      if (showExpandedPsa) {
+        animateIn(mContextualInfoRow);
+        if (mPSAMessage.getVisibility() != View.VISIBLE) {
+          mPSAMessage.setVisibility(View.VISIBLE);
+        }
+
+        if (mController == null || mController.getEventController() == null) {
+          endBatchEdit();
+          return;
+        }
+
+        String psaMessage = mController.getEventController().getPSAMessage();
+        updateTextViewIfNeeded(mPSAMessage, psaMessage, false);
+        mPSAMessage.setOnClickListener(mController.getEventController().getPSAAction());
+        post(() -> maybeSetMarquee(mPSAMessage));
+      } else {
+        if (mContextualInfoRow.getVisibility() != View.GONE) {
+          animateOut(mContextualInfoRow);
+        }
+      }
+    }
+
+    boolean showExpandedBattery =
+        showBattery
+            && batController != null
+            && batController.getBatteryLevel() >= 0
+            && (!minimalMode || mExpandedMinimalItem == MINIMAL_ITEM_BATTERY);
+
+    if (showExpandedBattery) {
+      int level = batController.getBatteryLevel();
+
+      if (level >= 0) {
+        updateBatteryPillContent();
+
+        if (mBatteryRow.getVisibility() != View.VISIBLE) {
+          mBatteryRow.setAlpha(1f);
+          animateIn(mBatteryRow);
+        } else if (mBatteryAlphaRestoreNeeded) {
+          mBatteryRow.animate().cancel();
+          mBatteryRow.setAlpha(1f);
+          mBatteryAlphaRestoreNeeded = false;
+        }
+
+        mBatteryRow.setOnTouchListener(
+            (v, event) -> {
+              switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                  v.animate().cancel();
+                  if (mShimmerAnimator != null) mShimmerAnimator.cancel();
+                  v.animate().scaleX(0.98f).scaleY(0.98f).alpha(0.96f).setDuration(80).start();
+                  v.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK);
+                  return true;
+                case MotionEvent.ACTION_UP:
+                  v.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(120).start();
+                  if (batController.getDeviceCount() > 1) {
+                    cycleBatteryDevice();
+                  } else {
+                    batController.launchBatterySettings();
+                  }
+                  postDelayed(
+                      () ->
+                          updateChargingShimmer(
+                              batController.isCharging(), batController.getBatteryLevel()),
+                      500);
+                  return true;
+                case MotionEvent.ACTION_CANCEL:
+                  v.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(120).start();
+                  postDelayed(
+                      () ->
+                          updateChargingShimmer(
+                              batController.isCharging(), batController.getBatteryLevel()),
+                      500);
+                  return true;
+              }
+              return false;
+            });
+
+        mBatteryRow.setOnClickListener(null);
+
+        mBatteryRow.setOnLongClickListener(
+            v -> {
+              batController.launchBatterySettings();
+              return true;
+            });
+      } else {
+        animateOut(mBatteryRow);
+      }
+    } else {
+      if (mBatteryRow.getVisibility() != View.GONE) {
+        animateOut(mBatteryRow);
+      }
+    }
+
+    endBatchEdit();
+  }
+
+  private void applyPlayerStyle() {
+    if (mNowPlayingContent instanceof LinearLayout content && mNowPlayingText != null) {
+      QuickSpacePlayerBinder.bind(content, mNowPlayingText, mController.getEventController());
+      mPlayerPlayPause = content.findViewById(R.id.quickspace_player_control);
+    }
+  }
+
+  private void refreshColorStateList() {
+    boolean useBlack =
+        LauncherPrefs.getPrefs(getContext()).getBoolean("pref_quickspace_black_text", false);
+
+    if (mCachedColorStateList != null && mCachedUseBlackText == useBlack) {
+      mColorStateList = mCachedColorStateList;
+      return;
+    }
+
+    int color =
+        useBlack ? Color.BLACK : Themes.getAttrColor(getContext(), R.attr.workspaceTextColor);
+    mColorStateList = ColorStateList.valueOf(color);
+    mCachedColorStateList = mColorStateList;
+    mCachedUseBlackText = useBlack;
+  }
+
+  private void updateColorForViews() {
+    if (mColorStateList == null) {
+      refreshColorStateList();
+      if (mColorStateList == null) return;
+    }
+
+    int targetColor = mColorStateList.getDefaultColor();
+
+    if (mCurrentStyle == 4 && mBinder != null) {
+      mBinder.applyColors(mColorStateList, mCachedUseBlackText);
+      return;
+    }
+
+    if (mEventTitle != null) {
+      animateTextColor(mEventTitle, targetColor);
+      updateShadows(mEventTitle);
+    }
+    if (mQuickspaceDayOfWeek != null) {
+      animateTextColor(mQuickspaceDayOfWeek, targetColor);
+      updateShadows(mQuickspaceDayOfWeek);
+    }
+    if (mQuickspaceClock != null) {
+      animateTextColor(mQuickspaceClock, targetColor);
+      updateShadows(mQuickspaceClock);
+    }
+    if (mQuickspaceDate != null) {
+      animateTextColor(mQuickspaceDate, targetColor);
+      updateShadows(mQuickspaceDate);
+    }
+    if (mPSAMessage != null) {
+      animateTextColor(mPSAMessage, targetColor);
+      updateShadows(mPSAMessage);
+    }
+    if (mWeatherTempSub != null) {
+      animateTextColor(mWeatherTempSub, targetColor);
+      updateShadows(mWeatherTempSub);
+    }
+    if (mExpandedWeatherTemp != null) {
+      animateTextColor(mExpandedWeatherTemp, targetColor);
+      updateShadows(mExpandedWeatherTemp);
+    }
+    if (mCalendarText != null) {
+      animateTextColor(mCalendarText, targetColor);
+      updateShadows(mCalendarText);
+    }
+    if (mCalendarIcon != null) mCalendarIcon.setImageTintList(mColorStateList);
+    if (mWeatherDivider != null) {
+      mWeatherDivider.setBackgroundColor(
+          Color.argb(
+              140, Color.red(targetColor), Color.green(targetColor), Color.blue(targetColor)));
+    }
+    if (mEventTitleSub != null) {
+      animateTextColor(mEventTitleSub, targetColor);
+      updateShadows(mEventTitleSub);
+    }
+    if (mNowPlayingText != null) {
+      if (isLargeStyle(mCurrentStyle) && mController.getEventController().isNowPlaying()) {
+        applyPlayerStyle();
+      } else {
+        animateTextColor(mNowPlayingText, targetColor);
+      }
+      updateShadows(mNowPlayingText);
+    }
+    if (mGreetingsExt != null) {
+      animateTextColor(mGreetingsExt, targetColor);
+      updateShadows(mGreetingsExt);
+    }
+    if (mGreetingsExtClock != null) {
+      animateTextColor(mGreetingsExtClock, targetColor);
+      updateShadows(mGreetingsExtClock);
+    }
+    if (mEventTitleSubColored != null) {
+      animateTextColor(mEventTitleSubColored, targetColor);
+      updateShadows(mEventTitleSubColored);
+    }
+
+    if (mBatteryDeviceName != null) {
+      animateTextColor(mBatteryDeviceName, targetColor);
+    }
+
+    if (mBatteryIcon != null) mBatteryIcon.setImageTintList(mColorStateList);
+    if (mBatteryChargingOverlay != null) mBatteryChargingOverlay.setImageTintList(mColorStateList);
+    updateMinimalChipAppearance();
+  }
+
+  private void animateTextColor(TextView view, int toColor) {
+    if (view == null) return;
+
+    int fromColor = view.getCurrentTextColor();
+    if (fromColor == toColor) return;
+
+    if (!mListening) {
+      view.setTextColor(toColor);
+      return;
+    }
+    ValueAnimator colorAnim = ValueAnimator.ofArgb(fromColor, toColor);
+    colorAnim.setDuration(COLOR_TRANSITION_DURATION);
+    colorAnim.addUpdateListener(
+        animator -> {
+          if (view != null && !mDestroyed) {
+            view.setTextColor((int) animator.getAnimatedValue());
+          }
+        });
+    colorAnim.start();
+  }
+
+  private void updateShadows(TextView view) {
+    if (view == null) return;
+    view.setShadowLayer(0, 0, 0, 0);
+  }
+
+  private void updateBatteryPillContent() {
+    QuickBatteryController batController = mController.getBatteryController();
+    if (batController == null) return;
+
+    String currentAddress = batController.getCurrentDeviceAddress();
+
+    refreshColorStateList();
+    updateColorForViews();
+
+    boolean deviceChanged =
+        mLastDeviceAddress != null && !TextUtils.equals(currentAddress, mLastDeviceAddress);
+
+    if (deviceChanged) {
+      performDeviceSwitchTransition(batController);
+    } else {
+      applyBatteryData(batController);
+    }
+
+    mLastDeviceAddress = currentAddress;
+  }
+
+  private void performDeviceSwitchTransition(QuickBatteryController batController) {
+    mBatteryRow.animate().cancel();
+    mBatteryRow
+        .animate()
+        .alpha(0f)
+        .translationX(-dpToPx(6))
+        .setDuration(DEVICE_SWITCH_DURATION)
+        .setInterpolator(new PathInterpolator(0.4f, 0f, 1f, 1f))
+        .withEndAction(
+            () -> {
+              applyBatteryData(batController);
+
+              mBatteryRow.setTranslationX(dpToPx(6));
+              mBatteryRow.animate().cancel();
+              mBatteryRow
+                  .animate()
+                  .alpha(1f)
+                  .translationX(0f)
+                  .setDuration(DEVICE_SWITCH_DURATION)
+                  .setInterpolator(new PathInterpolator(0f, 0f, 0.2f, 1f))
+                  .start();
+            })
+        .start();
+  }
+
+  private void applyBatteryData(QuickBatteryController batController) {
+    String deviceName = batController.getDeviceName();
+    int level = batController.getBatteryLevel();
+    boolean isAudio = batController.isAudioDevice();
+    boolean isCharging = getActualChargingState(batController);
+
+    updateTextViewIfNeeded(mBatteryDeviceName, deviceName, false);
+    String percentStr = level + "%";
+    updateTextViewIfNeeded(mBatteryPercentage, percentStr, false);
+
+    updateBatteryColors(level, isCharging);
+
+    if (mBatteryIcon != null) {
+      int iconRes = isAudio ? R.drawable.ic_audio_device : R.drawable.ic_battery_std;
+      mBatteryIcon.setImageResource(iconRes);
+    }
+
+    if (mBatteryChargingOverlay != null) {
+      if (mBatteryChargingOverlay.getVisibility() != View.GONE) {
+        mBatteryChargingOverlay.setVisibility(View.GONE);
+        mBatteryChargingOverlay.setAlpha(0f);
+      }
+    }
+
+    animateBatteryProgress(level, isCharging);
+    updateChargingShimmer(isCharging, level);
+
+    updateBatteryDots();
+  }
+
+  private boolean getActualChargingState(QuickBatteryController batController) {
+    boolean controllerState = batController.isCharging();
+
+    try {
+      android.os.BatteryManager bm =
+          (android.os.BatteryManager)
+              getContext().getSystemService(android.content.Context.BATTERY_SERVICE);
+      if (bm != null) {
+        int status = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_STATUS);
+        return (status == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+            || status == android.os.BatteryManager.BATTERY_STATUS_FULL);
+      }
+    } catch (Exception e) {
+    }
+
+    return controllerState;
+  }
+
+  private void cycleBatteryDevice() {
+    if (mController.getBatteryController() == null) return;
+
+    mController.getBatteryController().advanceIndex();
+    updateBatteryPillContent();
+  }
+
+  private void updateBatteryDots() {
+    if (mBatteryDotsContainer == null) return;
+    int count = mController.getBatteryController().getDeviceCount();
+    int current = mController.getBatteryController().getCurrentIndex();
+
+    if (count <= 1) {
+      mBatteryDotsContainer.setVisibility(View.GONE);
+      return;
+    }
+    mBatteryDotsContainer.setVisibility(View.VISIBLE);
+
+    if (mBatteryDotsContainer.getChildCount() != count) {
+      mBatteryDotsContainer.removeAllViews();
+      for (int i = 0; i < count; i++) {
+        View dot = new View(getContext());
+        int size = dpToPx(5);
+        int margin = dpToPx(4);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+        lp.setMarginStart(margin);
+        dot.setLayoutParams(lp);
+        dot.setBackgroundResource(R.drawable.bg_battery_dot);
+        mBatteryDotsContainer.addView(dot);
+      }
+    }
+
+    for (int i = 0; i < count; i++) {
+      View dot = mBatteryDotsContainer.getChildAt(i);
+      if (i == current) {
+        dot.setAlpha(1.0f);
+      } else {
+        dot.setAlpha(0.4f);
+      }
+    }
+  }
+
+  private void updateChargingShimmer(boolean isCharging, int level) {
+    if (mBatteryShimmer == null || !mListening) return;
+
+    if (mShimmerAnimator != null) {
+      mShimmerAnimator.cancel();
+      mShimmerAnimator = null;
+    }
+
+    if (isCharging && level < BATTERY_FULL_THRESHOLD) {
+      mBatteryShimmer.setVisibility(View.VISIBLE);
+      mBatteryShimmer.setAlpha(1f);
+      startShimmerAnimation();
+    } else {
+      mBatteryShimmer.setVisibility(View.GONE);
+      mBatteryShimmer.setAlpha(0f);
+      mBatteryShimmer.setTranslationX(0f);
+    }
+  }
+
+  private void startShimmerAnimation() {
+    if (mShimmerAnimator != null) mShimmerAnimator.cancel();
+
+    if (mBatteryProgress == null || mBatteryShimmer == null) return;
+
+    if (mBatteryProgress.getWidth() <= 0) return;
+
+    startShimmerAnimationInternal();
+  }
+
+  private void startShimmerAnimationInternal() {
+    mBatteryShimmer.post(
+        () -> {
+          if (mBatteryProgress == null || mBatteryShimmer == null || mDestroyed || !mListening)
+            return;
+
+          if (mShimmerAnimator != null) mShimmerAnimator.cancel();
+          mShimmerAnimator = ValueAnimator.ofFloat(0, 1);
+          mShimmerAnimator.setDuration(SHIMMER_DURATION_MS);
+          mShimmerAnimator.setInterpolator(new LinearInterpolator());
+          mShimmerAnimator.setRepeatCount(ValueAnimator.INFINITE);
+          mShimmerAnimator.addUpdateListener(
+              val -> {
+                if (mBatteryProgress == null
+                    || mBatteryShimmer == null
+                    || mDestroyed
+                    || !mListening) return;
+
+                float currentParentWidth = mBatteryProgress.getWidth();
+                if (currentParentWidth <= 0) return;
+
+                float desiredShimmerWidth = currentParentWidth * SHIMMER_WIDTH_RATIO;
+                float minShimmer = dpToPx(MIN_SHIMMER_WIDTH_DP);
+                if (desiredShimmerWidth < minShimmer) desiredShimmerWidth = minShimmer;
+
+                if (mBatteryShimmer.getLayoutParams().width != (int) desiredShimmerWidth) {
+                  ViewGroup.LayoutParams lp = mBatteryShimmer.getLayoutParams();
+                  lp.width = (int) desiredShimmerWidth;
+                  mBatteryShimmer.setLayoutParams(lp);
+                }
+
+                float currentShimmerWidth = desiredShimmerWidth;
+
+                float frac = val.getAnimatedFraction();
+                float trans =
+                    (currentParentWidth + currentShimmerWidth) * frac - currentShimmerWidth;
+                mBatteryShimmer.setTranslationX(trans);
+              });
+          mShimmerAnimator.start();
+        });
+  }
+
+  private void updateBatteryColors(int level, boolean isCharging) {
+    if (mBatteryProgress == null || mBatteryPercentage == null) return;
+
+    int progressColor;
+    int textColor;
+    int backplateColor;
+
+    if (level <= BATTERY_LOW_THRESHOLD) {
+      if (level <= BATTERY_CRITICAL_THRESHOLD) {
+        progressColor = Themes.getAttrColor(getContext(), android.R.attr.colorError);
+      } else {
+        progressColor = 0xFFFBC02D;
+      }
+      backplateColor = progressColor;
+      textColor = Color.BLACK;
+      mBatteryPercentage.setTypeface(Typeface.DEFAULT_BOLD);
+    } else {
+      progressColor = Themes.getAttrColor(getContext(), R.attr.workspaceAccentColor);
+      backplateColor = 0x4D000000;
+
+      if (level >= 90 && !isCharging) {
+        textColor = mColorStateList.withAlpha(150).getDefaultColor();
+      } else {
+        textColor = mColorStateList.getDefaultColor();
+      }
+      mBatteryPercentage.setTypeface(isCharging ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+    }
+
+    mBatteryPercentage.setAlpha(1.0f);
+    mBatteryPercentage.setTextColor(textColor);
+    mBatteryPercentage.setBackgroundTintList(ColorStateList.valueOf(backplateColor));
+
+    Drawable bg = mBatteryProgress.getBackground();
+    if (bg instanceof GradientDrawable) {
+      GradientDrawable gd = (GradientDrawable) bg;
+      int r = Color.red(progressColor);
+      int g = Color.green(progressColor);
+      int b = Color.blue(progressColor);
+
+      int startColor = Color.argb(80, r, g, b);
+      int midColor = Color.argb(25, r, g, b);
+      int endColor = 0x00FFFFFF;
+
+      if (level < BATTERY_LOW_THRESHOLD) {
+        startColor = Color.argb(200, r, g, b);
+        midColor = Color.argb(100, r, g, b);
+      }
+
+      gd.setColors(new int[] {startColor, midColor, endColor});
+      gd.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
+
+      gd.setAlpha(level < BATTERY_LOW_THRESHOLD ? 255 : 255);
+    }
+  }
+
+  private void animateBatteryProgress(int level, boolean isCharging) {
+    mBatteryRow.post(
+        () -> {
+          if (mBatteryRow == null || mBatteryProgress == null || mBatteryRow.getWidth() <= 0)
+            return;
+
+          int totalWidth = mBatteryRow.getWidth();
+          int targetWidth = (int) ((totalWidth * level) / 100f);
+
+          boolean significantChange =
+              Math.abs(level - mLastBatteryLevel) >= BATTERY_CHANGE_THRESHOLD;
+          boolean stateChange = isCharging != mLastChargingState;
+          boolean firstRun = mLastBatteryLevel == -1;
+
+          mLastBatteryLevel = level;
+
+          if (mBatteryProgress.getLayoutParams().width != targetWidth) {
+            if (mBatteryProgressAnimator != null && mBatteryProgressAnimator.isRunning()) {
+              mBatteryProgressAnimator.cancel();
+            }
+
+            if (!firstRun && (significantChange || stateChange)) {
+              mBatteryProgressAnimator =
+                  ValueAnimator.ofInt(mBatteryProgress.getLayoutParams().width, targetWidth);
+              mBatteryProgressAnimator.setDuration(BATTERY_PROGRESS_DURATION);
+              mBatteryProgressAnimator.setInterpolator(new DecelerateInterpolator(1.5f));
+              mBatteryProgressAnimator.addUpdateListener(
+                  animation -> {
+                    if (mBatteryProgress == null || mDestroyed) return;
+                    ViewGroup.LayoutParams lp = mBatteryProgress.getLayoutParams();
+                    lp.width = (int) animation.getAnimatedValue();
+                    mBatteryProgress.setLayoutParams(lp);
+                  });
+              mBatteryProgressAnimator.start();
+            } else {
+              ViewGroup.LayoutParams lp = mBatteryProgress.getLayoutParams();
+              lp.width = targetWidth;
+              mBatteryProgress.setLayoutParams(lp);
+            }
+          }
+        });
+  }
+
+  private void beginBatchEdit() {
+    if (mQuickspaceContent != null && !mIsLayoutSuppressed) {
+      mIsLayoutSuppressed = true;
+      mQuickspaceContent.suppressLayout(true);
+
+      ViewGroup parent = (ViewGroup) getParent();
+      if (parent != null) {
+        parent.suppressLayout(true);
+      }
+    }
+  }
+
+  private void endBatchEdit() {
+    if (mQuickspaceContent != null) {
+      mQuickspaceContent.suppressLayout(false);
+    }
+    if (mIsLayoutSuppressed) {
+      mIsLayoutSuppressed = false;
+      ViewGroup parent = (ViewGroup) getParent();
+      if (parent != null) {
+        parent.suppressLayout(false);
+      }
+    }
+  }
+
+  private final void loadViews() {
+    mQuickspaceContent = (ViewGroup) findViewById(R.id.quickspace_content);
+    if (mCurrentStyle == 4) {
+      if (mQuickspaceContent instanceof VoltageVerticalView) {
+        mBinder = (VoltageVerticalView) mQuickspaceContent;
+      }
+      return;
+    }
+
+    mEventTitle = (TextView) findViewById(R.id.quick_event_title);
+    mEventTitleSub = (TextView) findViewById(R.id.quick_event_title_sub);
+    mSubtitleLine = (ViewGroup) findViewById(R.id.subtitle_line);
+    mEventTitleSubColored = (TextView) findViewById(R.id.quick_event_title_sub_colored);
+    mNowPlayingIcon = (ImageView) findViewById(R.id.now_playing_icon_sub);
+    mEventSubIcon = (ImageView) findViewById(R.id.quick_event_icon_sub);
+    mWeatherIconSub = (ImageView) findViewById(R.id.quick_event_weather_icon);
+    mWeatherContentSub = (ViewGroup) findViewById(R.id.quick_event_weather_content);
+    mWeatherTempSub = (TextView) findViewById(R.id.quick_event_weather_temp);
+    mWeatherDivider = findViewById(R.id.quickspace_weather_divider);
+    mMinimalIconsRow = (ViewGroup) findViewById(R.id.quickspace_minimal_icons_row);
+    mMinimalWeatherChip = findViewById(R.id.quickspace_minimal_weather_chip);
+    mMinimalWeatherChipIcon = (ImageView) findViewById(R.id.quickspace_minimal_weather_icon);
+    mMinimalNowPlayingChip = findViewById(R.id.quickspace_minimal_now_playing_chip);
+    mMinimalNowPlayingChipIcon = (ImageView) findViewById(R.id.quickspace_minimal_now_playing_icon);
+    mMinimalCalendarChip = findViewById(R.id.quickspace_minimal_calendar_chip);
+    mMinimalCalendarChipIcon = (ImageView) findViewById(R.id.quickspace_minimal_calendar_icon);
+    mMinimalBatteryChip = findViewById(R.id.quickspace_minimal_battery_chip);
+    mMinimalBatteryChipIcon = (ImageView) findViewById(R.id.quickspace_minimal_battery_icon);
+    mMinimalPsaChip = findViewById(R.id.quickspace_minimal_psa_chip);
+    mMinimalPsaChipIcon = (ImageView) findViewById(R.id.quickspace_minimal_psa_icon);
+    mExpandedWeatherRow = (ViewGroup) findViewById(R.id.quickspace_weather_expanded_row);
+    mExpandedWeatherIcon = (ImageView) findViewById(R.id.quickspace_weather_expanded_icon);
+    mExpandedWeatherTemp = (TextView) findViewById(R.id.quickspace_weather_expanded_temp);
+
+    if (mQuickspaceContent != null) {
+      mQuickspaceContent.setClipChildren(false);
+      mQuickspaceContent.setClipToPadding(false);
+    }
+
+    if (mCurrentStyle == 1) {
+      mGreetingsExtClock = (TextView) findViewById(R.id.extended_greetings_clock);
+      mGreetingsExt = (TextView) findViewById(R.id.extended_greetings);
+    }
+
+    if (isLargeStyle(mCurrentStyle)) {
+      mQuickspaceDayOfWeek = findViewById(R.id.quickspace_day_of_week);
+      mQuickspaceClock = (AccentedTextClock) findViewById(R.id.quickspace_clock);
+      mQuickspaceDate = findViewById(R.id.quickspace_date);
+      mPSAMessage = findViewById(R.id.quickspace_psa_message);
+      mNowPlayingContent = findViewById(R.id.now_playing_content);
+      mNowPlayingText = findViewById(R.id.now_playing_text);
+      mContextualInfoRow = findViewById(R.id.contextual_info_row);
+
+      mBatteryRow = findViewById(R.id.battery_info_row);
+      mBatteryProgress = findViewById(R.id.battery_progress_bar);
+      mBatteryDeviceName = findViewById(R.id.battery_device_name);
+      mBatteryPercentage = findViewById(R.id.battery_percentage);
+      mBatteryIcon = findViewById(R.id.battery_icon);
+      mBatteryChargingOverlay = findViewById(R.id.battery_charging_overlay);
+      mBatteryDotsContainer = findViewById(R.id.battery_dots_container);
+      mBatteryShimmer = findViewById(R.id.battery_shimmer_view);
+
+      mCalendarContent = findViewById(R.id.quickspace_calendar_content);
+      mCalendarIcon = (ImageView) findViewById(R.id.quickspace_calendar_icon);
+      mCalendarText = (TextView) findViewById(R.id.quickspace_calendar_text);
+
+      if (mBatteryRow != null) {
+        mBatteryRow.setClipChildren(false);
+        mBatteryRow.setClipToPadding(false);
+        mBatteryRow.setContentDescription("Battery information");
+      }
+
+      if (mQuickspaceClock != null) {
+        mQuickspaceClock.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        mQuickspaceClock.setContentDescription("Current time");
+      }
+
+      if (mQuickspaceDate != null) {
+        mQuickspaceDate.setContentDescription("Current date");
+      }
+    }
+
+    boolean hasGoogleApp =
+        isPackageEnabled("com.google.android.googlequicksearchbox", getContext());
+    if (mWeatherContentSub != null) {
+      mWeatherContentSub.setOnClickListener(getActionReceiver().getWeatherAction(hasGoogleApp));
+    }
+    if (mExpandedWeatherRow != null) {
+      mExpandedWeatherRow.setOnClickListener(getActionReceiver().getWeatherAction(hasGoogleApp));
+    }
+
+    View.OnClickListener mediaClickListener =
+        v -> {
+          if (mController != null && mController.getEventController() != null) {
+            View.OnClickListener action = mController.getEventController().getAction();
+            if (action != null) {
+              action.onClick(v);
+            }
+          }
+        };
+
+    if (mNowPlayingIcon != null) {
+      mNowPlayingIcon.setOnClickListener(mediaClickListener);
+    }
+
+    if (mNowPlayingContent != null) {
+      mNowPlayingContent.setOnClickListener(mediaClickListener);
+    }
+  }
+
+  private void prepareLayout(int style) {
+    if (mCurrentStyle == style && mViewsLoaded) {
+      return;
+    }
+
+    mCurrentStyle = style;
+    mMarqueeTexts.clear();
+    if (mBinder != null) {
+      mBinder.onDestroy();
+      mBinder = null;
+    }
+    int indexOfChild = indexOfChild(mQuickspaceContent);
+    if (mQuickspaceContent != null) {
+      removeView(mQuickspaceContent);
+    }
+    int layoutId;
+    switch (style) {
+      case 1:
+        layoutId = R.layout.quickspace_alternate_double;
+        break;
+      case 2:
+        layoutId = R.layout.quickspace_large_style;
+        break;
+      case 3:
+        layoutId = R.layout.quickspace_voltage_paged_style;
+        break;
+      case 5:
+        layoutId = R.layout.quickspace_editorial_style;
+        break;
+      case 6:
+        layoutId = R.layout.quickspace_split_style;
+        break;
+      case 4:
+        layoutId = R.layout.quickspace_voltage_vertical;
+        break;
+      default:
+        layoutId = R.layout.quickspace_doubleline;
+    }
+    addView(LayoutInflater.from(getContext()).inflate(layoutId, this, false), indexOfChild);
+
+    loadViews();
+    if (mBinder != null) {
+      mBinder.onBind(mController);
+    }
+    if (mCurrentStyle == 4) {
+      refreshColorStateList();
+      updateColorForViews();
+    }
+    getQuickSpaceView();
+  }
+
+  private void getQuickSpaceView() {
+    if (mQuickspaceContent == null) return;
+
+    mQuickspaceContent.setVisibility(View.VISIBLE);
+    if (mQuickspaceContent.getAlpha() < 1f) {
+      mQuickspaceContent.setAlpha(0.8f);
+      mQuickspaceContent
+          .animate()
+          .setDuration(100)
+          .alpha(1.0f)
+          .setInterpolator(new DecelerateInterpolator(1.5f))
+          .start();
+    } else {
+      mQuickspaceContent.setAlpha(1f);
+    }
+  }
+
+  private void animateIn(View view) {
+    if (mDestroyed || mPendingDestroy || view == null) {
+      return;
+    }
+
+    if (!mListening) {
+      view.setVisibility(View.VISIBLE);
+      view.setAlpha(1f);
+      view.setTranslationY(0f);
+      return;
+    }
+    view.animate().cancel();
+
+    if (view.getVisibility() == View.VISIBLE
+        && view.getAlpha() == 1f
+        && view.getTranslationY() == 0f) {
+      return;
+    }
+
+    if (!view.isLaidOut()) {
+      view.setVisibility(View.INVISIBLE);
+      view.setAlpha(1f);
+      view.setTranslationY(0f);
+      view.post(
+          () -> {
+            if (view.getVisibility() == View.INVISIBLE) {
+              view.setVisibility(View.VISIBLE);
+            }
+          });
+      return;
+    }
+
+    if (view.getVisibility() != View.VISIBLE) {
+      view.setAlpha(0f);
+      view.setTranslationY(view.getHeight() / 2f);
+    }
+    view.setVisibility(View.VISIBLE);
+    mCurrentAnimateIn =
+        view.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(ANIMATE_IN_DURATION)
+            .setInterpolator(new DecelerateInterpolator())
+            .withEndAction(null);
+    mCurrentAnimateIn.start();
+  }
+
+  private void animateOut(View view) {
+    if (mDestroyed || mPendingDestroy || view == null) {
+      return;
+    }
+
+    if (!mListening) {
+      view.setVisibility(View.GONE);
+      view.setAlpha(1f);
+      view.setTranslationY(0f);
+      return;
+    }
+    if (view.getVisibility() != View.VISIBLE) {
+      return;
+    }
+    view.animate().cancel();
+
+    mCurrentAnimateOut =
+        view.animate()
+            .alpha(0f)
+            .translationY(view.getHeight() / 2f)
+            .setDuration(ANIMATE_OUT_DURATION)
+            .setInterpolator(new AccelerateInterpolator())
+            .withEndAction(
+                () -> {
+                  view.setVisibility(View.GONE);
+                  view.setTranslationY(0f);
+                  view.setAlpha(1f);
+                  view.setOnClickListener(null);
+                  if (view == mEventTitleSub && mSubtitleLine != null) {
+                    mSubtitleLine.setVisibility(View.GONE);
+                  }
+                });
+
+    mCurrentAnimateOut.start();
+  }
+
+  private void cancelAllAnimations() {
+    View[] animatedViews = {
+      mEventTitleSub,
+      mEventSubIcon,
+      mEventTitleSubColored,
+      mNowPlayingIcon,
+      mWeatherContentSub,
+      mExpandedWeatherRow,
+      mWeatherDivider,
+      mCalendarContent,
+      mMinimalIconsRow,
+      mQuickspaceContent,
+      mBatteryRow
+    };
+
+    for (View view : animatedViews) {
+      if (view != null) {
+        view.animate().cancel();
+        view.setAlpha(1f);
+        view.setTranslationX(0f);
+        view.setTranslationY(0f);
+      }
+    }
+
+    if (mCurrentAnimateIn != null) {
+      mCurrentAnimateIn.cancel();
+      mCurrentAnimateIn = null;
+    }
+    if (mCurrentAnimateOut != null) {
+      mCurrentAnimateOut.cancel();
+      mCurrentAnimateOut = null;
+    }
+    if (mBatteryProgressAnimator != null) {
+      mBatteryProgressAnimator.removeAllUpdateListeners();
+      mBatteryProgressAnimator.cancel();
+      mBatteryProgressAnimator = null;
+    }
+    if (mShimmerAnimator != null) {
+      mShimmerAnimator.removeAllUpdateListeners();
+      mShimmerAnimator.cancel();
+      mShimmerAnimator = null;
+    }
+  }
+
+  private void clearClickListeners() {
+    View[] clickableViews = {
+      mEventTitle,
+      mEventTitleSub,
+      mEventTitleSubColored,
+      mGreetingsExt,
+      mGreetingsExtClock,
+      mEventSubIcon,
+      mNowPlayingIcon,
+      mWeatherContentSub,
+      mCalendarContent,
+      mQuickspaceDayOfWeek,
+      mQuickspaceClock,
+      mQuickspaceDate,
+      mPSAMessage,
+      mNowPlayingContent,
+      mNowPlayingText,
+      mPlayerPlayPause,
+      mBatteryRow,
+      mExpandedWeatherRow,
+      mMinimalWeatherChip,
+      mMinimalNowPlayingChip,
+      mMinimalCalendarChip,
+      mMinimalBatteryChip,
+      mMinimalPsaChip
+    };
+
+    for (View view : clickableViews) {
+      if (view != null) {
+        view.setOnClickListener(null);
+        view.setOnLongClickListener(null);
+      }
+    }
+  }
+
+  private void safeRemoveListener() {
+    if (mController != null) mController.removeListener(this);
+    mListening = false;
+  }
+
+  private void updateSubscription() {
+    boolean listen =
+        mAttached
+            && mFinishedInflate
+            && mHostResumed
+            && mAggregatedVisible
+            && !mDestroyed
+            && !mPendingDestroy;
+    if (listen == mListening) return;
+    if (listen) {
+      mListening = true;
+      mVisualDirty = true;
+      mController.addListener(this);
+      mBatteryAlphaRestoreNeeded = true;
+      if (mShimmerAnimator != null && mShimmerAnimator.isPaused()) mShimmerAnimator.resume();
+    } else {
+      safeRemoveListener();
+      removeCallbacks(mDeferredUpdateRunnable);
+      cancelAllAnimations();
+    }
+  }
+
+  @Override
+  public void onVisibilityAggregated(boolean visible) {
+    super.onVisibilityAggregated(visible);
+    mAggregatedVisible = visible;
+    updateSubscription();
+  }
+
+  @Override
+  public void onAttachedToWindow() {
+    super.onAttachedToWindow();
+    if (mAttached || mDestroyed || mPendingDestroy) {
+      return;
+    }
+
+    mAttached = true;
+
+    try {
+      android.content.IntentFilter filter =
+          new android.content.IntentFilter(android.content.Intent.ACTION_WALLPAPER_CHANGED);
+      getContext().registerReceiver(mWallpaperChangeReceiver, filter);
+    } catch (Exception e) {
+    }
+
+    mBatteryAlphaRestoreNeeded = true;
+    mVisualDirty = true;
+
+    com.android.launcher3.views.ActivityContext activity =
+        com.android.launcher3.views.ActivityContext.lookupContextNoThrow(getContext());
+    // Wallpaper/grid previews render a snapshot but must never start live subscriptions.
+    mHostResumed =
+        activity instanceof com.android.launcher3.Launcher launcher && launcher.hasBeenResumed();
+    updateSubscription();
+    performDeferredUpdate();
+  }
+
+  @Override
+  public void onDetachedFromWindow() {
+    super.onDetachedFromWindow();
+    if (!mAttached) {
+      return;
+    }
+
+    try {
+      getContext().unregisterReceiver(mWallpaperChangeReceiver);
+    } catch (Exception e) {
+    }
+
+    mAttached = false;
+    updateSubscription();
+    removeCallbacks(mDeferredUpdateRunnable);
+    cancelAllAnimations();
+    safeRemoveListener();
+
+    if (mBinder != null) {
+      mBinder.onDestroy();
+      mBinder = null;
+      mViewsLoaded = false;
+    }
+
+    mAttached = false;
+  }
+
+  public boolean isPackageEnabled(String pkgName, Context context) {
+    try {
+      return context.getPackageManager().getApplicationInfo(pkgName, 0).enabled;
+    } catch (PackageManager.NameNotFoundException e) {
+      return false;
+    }
+  }
+
+  @Override
+  public void onFinishInflate() {
+    super.onFinishInflate();
+    loadViews();
+    mFinishedInflate = true;
+    mBubbleTextView = findViewById(R.id.dummyBubbleTextView);
+    mBubbleTextView.setTag(
+        new ItemInfo() {
+          @Override
+          public ComponentName getTargetComponent() {
+            return new ComponentName(getContext(), "");
+          }
+        });
+    mBubbleTextView.setContentDescription("");
+    if (mAttached) performDeferredUpdate();
+    updateSubscription();
+  }
+
+  @Override
+  public void onLayout(boolean b, int n, int n2, int n3, int n4) {
+    super.onLayout(b, n, n2, n3, n4);
+    if (mListening
+        && mShimmerAnimator == null
+        && mController != null
+        && mController.getBatteryController().isCharging()) {
+      updateChargingShimmer(true, mController.getBatteryController().getBatteryLevel());
+    }
+  }
+
+  public void onPause() {
+    mHostResumed = false;
+    updateSubscription();
+  }
+
+  public void onResume() {
+    mHostResumed = true;
+    updateSubscription();
+  }
+
+  public void prepareForDestroy() {
+    cancelAllAnimations();
+    safeRemoveListener();
+    clearClickListeners();
+  }
+
+  public void onDestroy() {
+    if (mDestroyed) {
+      return;
+    }
+
+    safeRemoveListener();
+    if (mController != null) mController.onDestroy();
+    mDestroyed = true;
+    mPendingDestroy = true;
+
+    removeCallbacks(mDeferredUpdateRunnable);
+
+    cancelAllAnimations();
+    mMarqueeTexts.clear();
+
+    safeRemoveListener();
+    clearClickListeners();
+
+    if (mController != null) {
+      safeRemoveListener();
+    }
+    mActionReceiver = null;
+    if (mBinder != null) {
+      mBinder.onDestroy();
+      mBinder = null;
+    }
+    mController = null;
+    mBubbleTextView = null;
+    mQuickspaceContent = null;
+    mEventSubIcon = null;
+    mNowPlayingIcon = null;
+    mEventTitleSub = null;
+    mSubtitleLine = null;
+    mEventTitleSubColored = null;
+    mGreetingsExt = null;
+    mGreetingsExtClock = null;
+    mWeatherContentSub = null;
+    mWeatherIconSub = null;
+    mWeatherTempSub = null;
+    mWeatherDivider = null;
+    mCalendarContent = null;
+    mCalendarIcon = null;
+    mCalendarText = null;
+    mMinimalIconsRow = null;
+    mMinimalWeatherChip = null;
+    mMinimalWeatherChipIcon = null;
+    mMinimalNowPlayingChip = null;
+    mMinimalNowPlayingChipIcon = null;
+    mMinimalCalendarChip = null;
+    mMinimalCalendarChipIcon = null;
+    mMinimalBatteryChip = null;
+    mMinimalBatteryChipIcon = null;
+    mMinimalPsaChip = null;
+    mMinimalPsaChipIcon = null;
+    mExpandedWeatherRow = null;
+    mExpandedWeatherIcon = null;
+    mExpandedWeatherTemp = null;
+    mEventTitle = null;
+
+    mQuickspaceDayOfWeek = null;
+    mQuickspaceClock = null;
+    mQuickspaceDate = null;
+    mPSAMessage = null;
+    mNowPlayingContent = null;
+    mNowPlayingText = null;
+    mPlayerPlayPause = null;
+    mContextualInfoRow = null;
+
+    mBatteryRow = null;
+    mBatteryProgress = null;
+    mBatteryDeviceName = null;
+    mBatteryPercentage = null;
+    mBatteryIcon = null;
+    mBatteryChargingOverlay = null;
+    mBatteryDotsContainer = null;
+    mBatteryShimmer = null;
+
+    mCachedColorStateList = null;
+
+    setBackground(null);
+
+    if (mAttached) {
+      try {
+        getContext().unregisterReceiver(mWallpaperChangeReceiver);
+      } catch (Exception e) {
+      }
+    }
+
+    mAttached = false;
+    mFinishedInflate = false;
+    mViewsLoaded = false;
+    mLastEventTitle = "";
+    mLastWeatherTemp = "";
+    mLastActionTitle = "";
+    mLastDeviceAddress = null;
+    mLastBatteryLevel = -1;
+    mLastCalendarEventId = -1;
+    mLastCalendarEventHash = 0;
+    mBatteryAlphaRestoreNeeded = false;
+    mLastMinimalModeState = false;
+    mExpandedMinimalItem = MINIMAL_ITEM_NONE;
+  }
+
+  public void setPadding(int n, int n2, int n3, int n4) {
+    super.setPadding(0, 0, 0, 0);
+  }
+
+  private int dpToPx(int dp) {
+    return (int) (dp * getResources().getDisplayMetrics().density);
+  }
+}

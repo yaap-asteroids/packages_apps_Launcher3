@@ -474,6 +474,8 @@ public class LoaderTask implements Runnable {
             mPrefs.put(PREF_MIGRATION_PENDING, true);
         }
 
+        dbController.reserveQuickSpace();
+
         synchronized (mBgDataModel) {
             mBgDataModel.clear();
             mPendingPackages.clear();

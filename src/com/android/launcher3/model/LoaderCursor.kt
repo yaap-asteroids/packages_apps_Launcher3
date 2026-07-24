@@ -468,7 +468,20 @@ constructor(
         }
 
         if (!occupied.containsKey(item.screenId)) {
-            occupied.put(item.screenId, GridOccupancy(countX + 1, countY + 1))
+            val screen = GridOccupancy(countX + 1, countY + 1)
+            if (
+                item.screenId == com.android.launcher3.Workspace.FIRST_SCREEN_ID &&
+                    LauncherPrefs.SHOW_QUICKSPACE.get(context)
+            ) {
+                screen.markCells(
+                    0,
+                    0,
+                    countX,
+                    com.android.launcher3.Workspace.getQuickSpaceSpanY(context, countY),
+                    true,
+                )
+            }
+            occupied.put(item.screenId, screen)
         }
         val occupancy = occupied[item.screenId]
 

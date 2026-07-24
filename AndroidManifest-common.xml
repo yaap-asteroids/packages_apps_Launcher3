@@ -56,6 +56,13 @@
     <uses-permission android:name="android.permission.REGISTER_STATS_PULL_ATOM"/>
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS"/>
 
+    <!-- QuickSpace: media access is privileged; calendar and Bluetooth are opt-in. -->
+    <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <uses-permission android:name="org.omnirom.omnijaws.READ_WEATHER" />
+
     <permission
         android:name="${applicationId}.permission.GRID_CONTROL"
         android:knownCerts="@array/grid_control_known_signers"

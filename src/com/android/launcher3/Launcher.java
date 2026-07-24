@@ -409,6 +409,10 @@ public class Launcher extends StatefulActivity<LauncherState>
             new OnSharedPreferenceChangeListener() {
                 @Override
                 public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+                    if (key != null && key.startsWith("pref_quickspace")) {
+                        mNeedsRestart = true;
+                        return;
+                    }
                     switch (key) {
                         case Utilities.KEY_DOCK_SEARCH:
                         case Utilities.KEY_DOCK_SEARCH_PROVIDER:
@@ -1155,6 +1159,10 @@ public class Launcher extends StatefulActivity<LauncherState>
         TraceHelper.INSTANCE.beginSection(ON_RESUME_EVT);
         super.onResume();
         mLauncherUiState.setIsResumedActivity(true);
+        View quickSpace = findViewById(R.id.reserved_container_workspace);
+        if (quickSpace instanceof com.android.launcher3.quickspace.QuickSpaceView view) {
+            view.onResume();
+        }
         DragView.removeAllViews(this);
         mOverlayManager.onActivityResumed();
         TraceHelper.INSTANCE.endSection();
@@ -1171,6 +1179,10 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         super.onPause();
         mLauncherUiState.setIsResumedActivity(false);
+        View quickSpace = findViewById(R.id.reserved_container_workspace);
+        if (quickSpace instanceof com.android.launcher3.quickspace.QuickSpaceView view) {
+            view.onPause();
+        }
         mDragController.cancelDrag();
         mLastTouchUpTime = -1;
         mDropTargetBar.animateToVisibility(false);
@@ -1633,6 +1645,10 @@ public class Launcher extends StatefulActivity<LauncherState>
     public void onDestroy() {
         super.onDestroy();
         ACTIVITY_TRACKER.onContextDestroyed(this);
+        View quickSpace = findViewById(R.id.reserved_container_workspace);
+        if (quickSpace instanceof com.android.launcher3.quickspace.QuickSpaceView view) {
+            view.onDestroy();
+        }
 
         if (mNaturalScrollingChangedSafeCloseable != null) {
             mNaturalScrollingChangedSafeCloseable.close();

@@ -53,6 +53,7 @@ class WorkspaceItemSpaceFinderTest : AbstractWorkspaceModelTest() {
                 mTargetContext.bgDataModel,
                 mAppState.invariantDeviceProfile,
                 model,
+                mTargetContext,
             )
             .findSpaceForItem(mAddedWorkspaceItems, spanX, spanY, excludedScreens, startingFrom)
 

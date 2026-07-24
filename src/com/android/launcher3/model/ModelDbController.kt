@@ -121,6 +121,53 @@ internal constructor(
             extras = Bundle().apply { putString(EXTRA_DB_NAME, openHelper.databaseName) }
         }
 
+    /** Makes room before LoaderCursor validates overlaps, preserving covered shortcuts/widgets. */
+    @WorkerThread
+    fun reserveQuickSpace() {
+        if (!prefs.get(LauncherPrefs.SHOW_QUICKSPACE)) return
+        val items = mutableListOf<com.android.launcher3.model.data.ItemInfo>()
+        query(
+                arrayOf(_ID, SCREEN, CELLX, CELLY, SPANX, SPANY),
+                "$CONTAINER = $CONTAINER_DESKTOP",
+                null,
+                "$SCREEN, $CELLY, $CELLX, $_ID",
+            )
+            .use { cursor ->
+                while (cursor.moveToNext()) {
+                    items.add(
+                        com.android.launcher3.model.data.ItemInfo().apply {
+                            id = cursor.getInt(0)
+                            screenId = cursor.getInt(1)
+                            cellX = cursor.getInt(2)
+                            cellY = cursor.getInt(3)
+                            spanX = cursor.getInt(4)
+                            spanY = cursor.getInt(5)
+                        }
+                    )
+                }
+            }
+        val relocated =
+            com.android.launcher3.quickspace.QuickSpaceLayoutPlanner.reserveSpace(
+                items,
+                idp.numColumns,
+                idp.numRows,
+                com.android.launcher3.Workspace.getQuickSpaceSpanY(context, idp.numRows),
+            )
+        if (relocated.isEmpty()) return
+        newTransaction().use { transaction ->
+            for (item in relocated) {
+                val values =
+                    ContentValues().apply {
+                        put(SCREEN, item.screenId)
+                        put(CELLX, item.cellX)
+                        put(CELLY, item.cellY)
+                    }
+                check(update(values, "$_ID = ?", arrayOf(item.id.toString())) == 1)
+            }
+            transaction.commit()
+        }
+    }
+
     /** Refer [SQLiteDatabase.insert] */
     @WorkerThread
     fun insert(initialValues: ContentValues?): Int {

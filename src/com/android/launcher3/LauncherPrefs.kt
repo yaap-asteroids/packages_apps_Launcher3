@@ -332,6 +332,24 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
                 type = String::class.java,
             )
 
+        // QuickSpace is opt-in and uses the same backed-up store as Home settings.
+        @JvmField val SHOW_QUICKSPACE = backedUpItem("pref_quickspace", false)
+        @JvmField val QUICKSPACE_UI_STYLE = backedUpItem("pref_quickspace_style", "0")
+        @JvmField
+        val QUICKSPACE_VOLTAGE_ACCENT = backedUpItem("pref_quickspace_voltage_accent", true)
+        @JvmField
+        val QUICKSPACE_VOLTAGE_MINIMAL = backedUpItem("pref_quickspace_voltage_minimal", false)
+        @JvmField val SHOW_QUICKSPACE_PSONALITY = backedUpItem("pref_quickspace_psonality", true)
+        @JvmField val SHOW_QUICKSPACE_NOWPLAYING = backedUpItem("pref_quickspace_np", true)
+        @JvmField val QUICKSPACE_PLAYER_STYLE = backedUpItem("pref_quickspace_player_style", "0")
+        @JvmField val SHOW_QUICKSPACE_WEATHER = backedUpItem("pref_quickspace_weather", true)
+        @JvmField
+        val SHOW_QUICKSPACE_WEATHER_CITY = backedUpItem("pref_quickspace_weather_city", false)
+        @JvmField
+        val SHOW_QUICKSPACE_WEATHER_TEXT = backedUpItem("pref_quickspace_weather_text", true)
+        @JvmField val SHOW_QUICKSPACE_BATTERY = backedUpItem("pref_quickspace_battery", false)
+        @JvmField val SHOW_QUICKSPACE_CALENDAR = backedUpItem("pref_quickspace_calendar", false)
+
         @JvmField val ENABLE_COMPOSITION_TRACING = backedUpItem(COMPOSITION_TRACING_PREF_KEY, false)
 
         @JvmField

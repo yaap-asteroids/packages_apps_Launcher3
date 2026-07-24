@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <dimen name="quickspace_alternate_subtitle_size">16sp</dimen>
+    <dimen name="quickspace_alternate_title_size">18sp</dimen>
+    <dimen name="quickspace_subtitle_size">16sp</dimen>
+    <dimen name="quickspace_title_size">20sp</dimen>
+    <dimen name="quickspace_vertical_compact_height">140dp</dimen>
+    <dimen name="quickspace_vertical_date_size">26sp</dimen>
+    <dimen name="quickspace_vertical_divider_gap">5dp</dimen>
+    <dimen name="quickspace_vertical_divider_inset">12dp</dimen>
+    <dimen name="quickspace_vertical_label_gap">6dp</dimen>
+    <dimen name="quickspace_vertical_label_size">10sp</dimen>
+    <dimen name="quickspace_vertical_marker_gap">9dp</dimen>
+    <dimen name="quickspace_vertical_marker_size">3dp</dimen>
+    <dimen name="quickspace_vertical_outer_padding">12dp</dimen>
+    <dimen name="quickspace_vertical_row_gap">8dp</dimen>
+    <dimen name="quickspace_vertical_rule_margin">8dp</dimen>
+    <dimen name="quickspace_vertical_shadow_radius">1.25dp</dimen>
+    <dimen name="quickspace_vertical_value_size">14sp</dimen>
+    <dimen name="quickspace_vertical_wordmark_max_size">40sp</dimen>
+    <dimen name="quickspace_vertical_wordmark_min_size">18sp</dimen>
+    <dimen name="quickspace_vertical_wordmark_padding">4dp</dimen>
+    <item type="id" name="quickspace_vertical_a11y_battery" />
+    <item type="id" name="quickspace_vertical_a11y_calendar" />
+    <item type="id" name="quickspace_vertical_a11y_calendar_event" />
+    <item type="id" name="quickspace_vertical_a11y_event" />
+    <item type="id" name="quickspace_vertical_a11y_weather" />
+    <item type="id" name="reserved_container_workspace" />
+    <item type="id" name="quickspace_player_control" />
+    <string name="intent_no_app_clock_found">Unable to find calendar or clock activity</string>
+    <string name="qe_now_playing_by">By</string>
+    <string name="qe_now_playing_ext_one">Now playing</string>
+    <string name="qe_now_playing_unknown_artist">Unknown Artist</string>
+    <string name="quick_event_weather_clear">Clear Sky</string>
+    <string name="quick_event_weather_clouds">Cloudy</string>
+    <string name="quick_event_weather_mist">Misty</string>
+    <string name="quick_event_weather_rain">Rainy</string>
+    <string name="quick_event_weather_snow">Snowy</string>
+    <string name="quick_event_weather_storm">Stormy</string>
+    <string name="quick_event_weather_wind">Windy</string>
+    <string name="quickspace_calendar_untitled">Untitled event</string>
+    <string name="quickspace_date_format" translatable="false">EEE, MMM d</string>
+    <string name="quickspace_date_format_minimalistic" translatable="false">EEEE, MMMM d</string>
+    <string name="quickspace_ext_one">Today is</string>
+    <string name="quickspace_ext_two">It\'s</string>
+    <string name="quickspace_grt_afternoon">Good afternoon.</string>
+    <string name="quickspace_grt_evening">Good evening.</string>
+    <string name="quickspace_grt_general">Good day.</string>
+    <string name="quickspace_grt_morning">Good morning.</string>
+    <string name="quickspace_grt_night">Good night.</string>
+    <string name="quickspace_vertical_a11y_battery">Open battery settings</string>
+    <string name="quickspace_vertical_a11y_calendar">Open calendar</string>
+    <string name="quickspace_vertical_a11y_calendar_event">Open calendar event</string>
+    <string name="quickspace_vertical_a11y_event">Open now playing</string>
+    <string name="quickspace_vertical_a11y_note">Open note</string>
+    <string name="quickspace_vertical_a11y_weather">Open weather</string>
+    <string name="quickspace_vertical_battery">BATTERY</string>
+    <string name="quickspace_vertical_battery_value">%1$s · %2$d%%</string>
+    <string name="quickspace_vertical_calendar">CALENDAR</string>
+    <string name="quickspace_vertical_note">NOTE</string>
+    <string name="quickspace_vertical_now_playing">NOW PLAYING</string>
+    <string name="quickspace_vertical_weather">WEATHER</string>
+    <style name="QuickSpaceSubText">
+        <item name="android:fontFamily">@*android:string/config_bodyFontFamily</item>
+    </style>
+    <style name="QuickSpaceText">
+        <item name="android:fontFamily">@*android:string/config_headlineFontFamily</item>
+    </style>
+    <string name="quickspace_vertical_content_description">QuickSpace overview</string>
+    <string name="quick_event_ambient_weather_summary">Display current weather update</string>
+    <string name="quick_event_ambient_weather_title">Weather update</string>
+    <string name="quick_event_weather_city_summary">Display current weather location</string>
+    <string name="quick_event_weather_city_title">Current location</string>
+    <string name="quick_event_weather_text_summary">Display current weather condition summary</string>
+    <string name="quick_event_weather_text_title">Current condition</string>
+    <string name="quickspace_battery_summary">Show phone and connected bluetooth device battery in Bold style</string>
+    <string name="quickspace_battery_title">Device Battery</string>
+    <string name="quickspace_calendar_summary">Show your next event from any enabled calendar</string>
+    <string name="quickspace_calendar_title">Calendar events</string>
+    <string name="quickspace_category_title">Quickspace</string>
+    <string name="quickspace_now_playing_summary">Show the song you\'re playing</string>
+    <string name="quickspace_now_playing_title">Now playing</string>
+    <string name="quickspace_psa_summary">Make your companion more lively with random messages</string>
+    <string name="quickspace_psa_title">Random messages</string>
+    <string name="quickspace_style_title">At A Glance style</string>
+    <string name="quickspace_voltage_accent_summary">Color the first number of the clock in Bold style</string>
+    <string name="quickspace_voltage_accent_title">Accent colored clock</string>
+    <string name="quickspace_voltage_minimal_summary">Collapse secondary content into tappable quick icons</string>
+    <string name="quickspace_voltage_minimal_title">Minimal mode</string>
+    <string name="show_quickspace_summary">Show at the top of your home screen</string>
+    <string name="show_quickspace_title">At A Glance</string>
+    <string-array name="quickspace_style_entries">
+        <item>Default</item>
+        <item>Extended</item>
+        <item>Bold</item>
+        <item>Bold paged</item>
+        <item>Vertical</item>
+        <item>Editorial</item>
+        <item>Split</item>
+    </string-array>
+    <string-array name="quickspace_style_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+    </string-array>
+    <string name="quickspace_player_style_title">Player style</string>
+    <string name="quickspace_player_style_summary">Player appearance in Bold, Bold paged, Editorial and Split layouts</string>
+    <string name="quickspace_player_play_pause">Pause playback</string>
+    <string-array name="quickspace_player_style_entries">
+        <item>Inline</item>
+        <item>Two-line</item>
+        <item>Media card</item>
+    </string-array>
+    <string-array name="quickspace_player_style_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+</resources>
